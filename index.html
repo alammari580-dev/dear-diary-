@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="Dear Diary"/>
+  <title>Dear Diary 🌸</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;600;700&family=Nunito:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/lucide-react@0.263.1/dist/umd/lucide-react.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Nunito',sans-serif;background:#fff0f5;}
+    ::-webkit-scrollbar{width:6px;}
+    ::-webkit-scrollbar-track{background:transparent;}
+    ::-webkit-scrollbar-thumb{background:#f4a7b9;border-radius:3px;}
+    .ds{font-family:'Dancing Script',cursive;}
+    .nu{font-family:'Nunito',sans-serif;}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pop{0%{transform:scale(0.8);opacity:0}100%{transform:scale(1);opacity:1}}
+    .fade-in{animation:fadeIn 0.3s ease forwards;}
+    .pop{animation:pop 0.2s ease forwards;}
+    input,textarea,button{font-family:'Nunito',sans-serif;}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useRef, useEffect } = React;
+const {
+  Heart, MessageCircle, Search, Bell, Settings, Home, BookOpen,
+  Image, Calendar, Users, Plus, X, Send, Camera, Pencil, Star,
+  ChevronLeft, LogOut, Trash2, Edit3, Upload, Smile, Type,
+  Palette, StickyNote, Download, Eye, EyeOff, Menu
+} = LucideReact;
+
+// ── Constants
+const MEMBERS_INIT = [
+  { id:1, name:"Hanoof", username:"hanoof", password:"1234", color:"#F4A7B9", avatar:"H", bio:"Living in the moment ✨", profilePic:null, profileBanner:null },
+  { id:2, name:"Raghad", username:"raghad", password:"1234", color:"#C8A8E9", avatar:"R", bio:"Dream big, smile bigger 💜", profilePic:null, profileBanner:null },
+  { id:3, name:"Asma",   username:"asma",   password:"1234", color:"#8ECFC4", avatar:"A", bio:"Nature lover & bookworm 🌿", profilePic:null, profileBanner:null },
+];
+const PAPER_TYPES = ["lined","dotted","plain","grid"];
+const PAPER_COLORS = ["#fffdf7","#fff0f5","#f0f4ff","#f0fff4","#fff8f0","#faf0fe"];
+const MOODS = ["😊","😢","😍","😤","😴","🥳","😌","🤔","😰","🥹"];
+
+// ── localStorage helpers
+const lsLoad = (key, fallback) => {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+  catch { return fallback; }
+};
+const lsSave = (key, val) => {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+};
+
+// ── Background Removal
+const removeBackground = (dataUrl, tolerance) => new Promise(resolve => {
+  const img = new window.Image();
+  img.onload = () => {
+    const W = Math.min(img.width, 600);
+    const H = Math.round(img.height * W / img.width);
+    const canvas = document.createElement("canvas");
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, W, H);
+    const d = ctx.getImageData(0, 0, W, H);
+    const px = d.data;
+    const get = (x,y) => { const i=(y*W+x)*4; return [px[i],px[i+1],px[i+2]]; };
+    const pts = [[0,0],[W-1,0],[0,H-1],[W-1,H-1],[~~(W/2),0],[0,~~(H/2)],[W-1,~~(H/2)],[~~(W/2),H-1]];
+    const avg = arr => Math.round(arr.reduce((a,b)=>a+b,0)/arr.length);
+    const samples = pts.map(([x,y])=>get(x,y));
+    const bgR=avg(samples.map(s=>s[0])), bgG=avg(samples.map(s=>s[1])), bgB=avg(samples.map(s=>s[2]));
+    for(let i=0;i<px.length;i+=4){
+      const dist=Math.sqrt((px[i]-bgR)**2+(px[i+1]-bgG)**2+(px[i+2]-bgB)**2);
+      if(dist<tolerance) px[i+3]=0;
+      else if(dist<tolerance+25) px[i+3]=Math.round(255*(dist-tolerance)/25);
+    }
+    ctx.putImageData(d,0,0);
+    resolve(canvas.toDataURL("image/png"));
+  };
+  img.src=dataUrl;
+});
+
+// ── Polka Dot Background
+const PolkaBg = () => (
+  <div style={{
+    position:"fixed",inset:0,zIndex:-1,
+    backgroundImage:"radial-gradient(#f9c5d1 1.5px, transparent 1.5px)",
+    backgroundSize:"28px 28px",
+    backgroundColor:"#fff5f8"
+  }}/>
+);
+
+// ── Avatar
+const Avatar = ({ member, size=40, style={} }) => (
+  <div style={{
+    width:size, height:size, borderRadius:"50%",
+    background:member.color,
+    display:"flex", alignItems:"center", justifyContent:"center",
+    fontSize:size*0.4, fontWeight:700, color:"#fff",
+    overflow:"hidden", flexShrink:0,
+    border:"2px solid #fff", boxShadow:"0 2px 8px rgba(0,0,0,0.12)",
+    ...style
+  }}>
+    {member.profilePic
+      ? <img src={member.profilePic} alt={member.name} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+      : member.avatar}
+  </div>
+);
+
+// ── Glass Card
+const GlassCard = ({ children, style={}, className="", onClick }) => (
+  <div className={className} onClick={onClick} style={{
+    background:"rgba(255,255,255,0.7)",
+    backdropFilter:"blur(12px)",
+    WebkitBackdropFilter:"blur(12px)",
+    borderRadius:24,
+    border:"1px solid rgba(255,255,255,0.8)",
+    boxShadow:"0 4px 24px rgba(244,167,185,0.12)",
+    ...style
+  }}>
+    {children}
+  </div>
+);
+
+// ── Pill Button
+const PillBtn = ({ children, onClick, color="#F4A7B9", textColor="#fff", style={}, disabled=false, variant="fill" }) => (
+  <button onClick={onClick} disabled={disabled} style={{
+    padding:"8px 20px", borderRadius:999,
+    border: variant==="outline" ? `2px solid ${color}` : "none",
+    background: variant==="outline" ? "transparent" : color,
+    color: variant==="outline" ? color : textColor,
+    fontWeight:600, cursor:disabled?"not-allowed":"pointer",
+    opacity:disabled?0.6:1,
+    display:"inline-flex", alignItems:"center", gap:6,
+    fontSize:14, transition:"all 0.2s",
+    ...style
+  }}>
+    {children}
+  </button>
+);
+
+// ── File Upload Button
+const FileUploadBtn = ({ onFile, accept="image/*", label, color="#F4A7B9", style={} }) => {
+  const ref = useRef();
+  const handle = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => onFile(ev.target.result);
+    reader.readAsDataURL(file);
+    e.target.value="";
+  };
+  return (
+    <>
+      <input ref={ref} type="file" accept={accept} style={{display:"none"}} onChange={handle}/>
+      <PillBtn onClick={() => ref.current.click()} color={color} style={style}>
+        <Upload size={14}/> {label}
+      </PillBtn>
+    </>
+  );
+};
+
+// ── Paper Background
+const paperStyle = (type, color) => {
+  const base = { background:color, minHeight:300, position:"relative", borderRadius:16, padding:16 };
+  if(type==="lined") return { ...base, backgroundImage:`linear-gradient(${color} 95%, #e0c8d0 100%)`, backgroundSize:"100% 28px" };
+  if(type==="dotted") return { ...base, backgroundImage:`radial-gradient(circle, #c9aab5 1px, transparent 1px)`, backgroundSize:"20px 20px" };
+  if(type==="grid") return { ...base, backgroundImage:`linear-gradient(rgba(200,168,233,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(200,168,233,0.3) 1px, transparent 1px)`, backgroundSize:"20px 20px" };
+  return base;
+};
+
+// ── DraggableItem
+const DraggableItem = ({ item, containerRef, onMove, onRemove, isOwner }) => {
+  const ref = useRef();
+  const dragging = useRef(false);
+  const offset = useRef({x:0,y:0});
+  const getXY = e => { const t=e.touches?e.touches[0]:e; return {x:t.clientX,y:t.clientY}; };
+  const startDrag = e => {
+    if(!isOwner) return;
+    e.preventDefault();
+    dragging.current=true;
+    const rect=ref.current.getBoundingClientRect();
+    const {x,y}=getXY(e);
+    offset.current={x:x-rect.left,y:y-rect.top};
+    window.addEventListener("mousemove",onDrag);
+    window.addEventListener("mouseup",stopDrag);
+    window.addEventListener("touchmove",onDrag,{passive:false});
+    window.addEventListener("touchend",stopDrag);
+  };
+  const onDrag = e => {
+    if(!dragging.current) return;
+    e.preventDefault();
+    const cRect=containerRef.current.getBoundingClientRect();
+    const {x,y}=getXY(e);
+    const nx=((x-cRect.left-offset.current.x)/cRect.width)*100;
+    const ny=((y-cRect.top-offset.current.y)/cRect.height)*100;
+    onMove(item.id,Math.max(0,Math.min(85,nx)),Math.max(0,Math.min(85,ny)));
+  };
+  const stopDrag = () => {
+    dragging.current=false;
+    window.removeEventListener("mousemove",onDrag);
+    window.removeEventListener("mouseup",stopDrag);
+    window.removeEventListener("touchmove",onDrag);
+    window.removeEventListener("touchend",stopDrag);
+  };
+  const isImage = typeof item.content==="string"
+    ? item.content.startsWith("data:")
+    : item.url && item.url.startsWith("data:");
+  const src = item.content||item.url;
+  const w = item.w||80;
+  return (
+    <div ref={ref} onMouseDown={startDrag} onTouchStart={startDrag}
+      onDoubleClick={() => isOwner && onRemove(item.id)}
+      style={{ position:"absolute", left:`${item.x}%`, top:`${item.y}%`,
+        cursor:isOwner?"grab":"default", userSelect:"none", zIndex:10,
+        filter:"drop-shadow(0 2px 6px rgba(0,0,0,0.15))" }}
+      title={isOwner?"Double-click to remove":""}>
+      {isImage
+        ? <img src={src} alt="" style={{width:w,height:"auto",maxWidth:200,pointerEvents:"none",borderRadius:item.content?0:8}}/>
+        : <span style={{fontSize:32}}>{src}</span>}
+    </div>
+  );
+};
+
+// ── Sticker Creator
+const StickerCreator = ({ onAdd }) => {
+  const [original, setOriginal] = useState(null);
+  const [processed, setProcessed] = useState(null);
+  const [tolerance, setTolerance] = useState(40);
+  const [processing, setProcessing] = useState(false);
+  const handleFile = dataUrl => { setOriginal(dataUrl); setProcessed(null); };
+  const process = async () => {
+    if(!original) return;
+    setProcessing(true);
+    const result = await removeBackground(original, tolerance);
+    setProcessed(result);
+    setProcessing(false);
+  };
+  const addSticker = () => {
+    if(!processed&&!original) return;
+    onAdd({id:Date.now(),content:processed||original,x:10,y:10});
+    setOriginal(null); setProcessed(null);
+  };
+  return (
+    <div style={{padding:16}}>
+      <p style={{fontSize:13,color:"#888",marginBottom:12}}>Upload a photo to create a custom sticker. The background will be removed automatically.</p>
+      <FileUploadBtn onFile={handleFile} label="Upload Photo" color="#C8A8E9"/>
+      {original && (
+        <div style={{marginTop:16}}>
+          <div style={{display:"flex",gap:12,marginBottom:12}}>
+            <div style={{flex:1,textAlign:"center"}}>
+              <p style={{fontSize:11,color:"#aaa",marginBottom:4}}>Original</p>
+              <img src={original} alt="orig" style={{maxWidth:"100%",maxHeight:120,borderRadius:8,objectFit:"contain"}}/>
+            </div>
+            {processed && (
+              <div style={{flex:1,textAlign:"center"}}>
+                <p style={{fontSize:11,color:"#aaa",marginBottom:4}}>Processed</p>
+                <div style={{background:"repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 0 0 / 16px 16px",borderRadius:8,display:"inline-block"}}>
+                  <img src={processed} alt="proc" style={{maxWidth:"100%",maxHeight:120,borderRadius:8,objectFit:"contain",display:"block"}}/>
+                </div>
+              </div>
+            )}
+          </div>
+          <label style={{fontSize:13,color:"#666",display:"block",marginBottom:4}}>Tolerance: <strong>{tolerance}</strong></label>
+          <input type="range" min={10} max={120} value={tolerance} onChange={e=>setTolerance(+e.target.value)} style={{width:"100%",accentColor:"#C8A8E9",marginBottom:12}}/>
+          <div style={{display:"flex",gap:8}}>
+            <PillBtn onClick={process} color="#8ECFC4" disabled={processing}>{processing?"Processing…":"Remove BG"}</PillBtn>
+            <PillBtn onClick={addSticker} color="#F4A7B9" disabled={!original}>Add as Sticker</PillBtn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── New Entry Modal
+const NewEntryModal = ({ member, members, onSave, onClose }) => {
+  const [tab, setTab] = useState("write");
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [mood, setMood] = useState("");
+  const [paperType, setPaperType] = useState("lined");
+  const [paperColor, setPaperColor] = useState(PAPER_COLORS[0]);
+  const [privacy, setPrivacy] = useState("friends");
+  const [stickers, setStickers] = useState([]);
+  const [images, setImages] = useState([]);
+  const canvasRef = useRef();
+  const handleImage = dataUrl => { setImages(prev=>[...prev,{id:Date.now(),url:dataUrl,x:10,y:10,w:150}]); setTab("write"); };
+  const moveSticker = (id,x,y) => setStickers(prev=>prev.map(s=>s.id===id?{...s,x,y}:s));
+  const removeSticker = id => setStickers(prev=>prev.filter(s=>s.id!==id));
+  const moveImage = (id,x,y) => setImages(prev=>prev.map(i=>i.id===id?{...i,x,y}:i));
+  const removeImage = id => setImages(prev=>prev.filter(i=>i.id!==id));
+  const save = (draft=false) => {
+    if(!title.trim()&&!body.trim()) return;
+    onSave({ id:Date.now(), authorId:member.id, title:title||"Untitled", body, mood, paperType, paperColor, privacy, stickers, images, isDraft:draft, likes:[], comments:[], date:new Date().toISOString() });
+  };
+  const tabs = [
+    {id:"write",label:"Write",icon:<Type size={14}/>},
+    {id:"style",label:"Style",icon:<Palette size={14}/>},
+    {id:"stickers",label:"Stickers",icon:<Star size={14}/>},
+    {id:"images",label:"Images",icon:<Image size={14}/>},
+  ];
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:16}}>
+      <GlassCard style={{width:"100%",maxWidth:520,maxHeight:"90vh",display:"flex",flexDirection:"column"}} className="fade-in">
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 20px",borderBottom:"1px solid rgba(244,167,185,0.2)"}}>
+          <h2 className="ds" style={{fontSize:22,color:"#d4608a"}}>New Entry</h2>
+          <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:"#aaa"}}><X size={20}/></button>
+        </div>
+        <div style={{display:"flex",gap:4,padding:"8px 16px",borderBottom:"1px solid rgba(244,167,185,0.15)"}}>
+          {tabs.map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{
+              padding:"6px 12px",borderRadius:999,border:"none",cursor:"pointer",
+              background:tab===t.id?"#F4A7B9":"transparent",
+              color:tab===t.id?"#fff":"#888",
+              fontWeight:600,fontSize:12,display:"flex",alignItems:"center",gap:4
+            }}>{t.icon}{t.label}</button>
+          ))}
+        </div>
+        <div style={{flex:1,overflowY:"auto"}}>
+          {tab==="write" && (
+            <div style={{padding:16}}>
+              <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Title your entry..."
+                style={{width:"100%",border:"none",background:"transparent",fontSize:20,fontFamily:"'Dancing Script',cursive",color:"#d4608a",outline:"none",marginBottom:8}}/>
+              <div ref={canvasRef} style={{...paperStyle(paperType,paperColor),minHeight:280,marginBottom:12}}>
+                <textarea value={body} onChange={e=>setBody(e.target.value)} placeholder="Dear Diary..."
+                  style={{width:"100%",background:"transparent",border:"none",outline:"none",resize:"none",minHeight:240,fontSize:15,lineHeight:"28px",fontFamily:"'Nunito',sans-serif",color:"#555"}}/>
+                {stickers.map(s=><DraggableItem key={s.id} item={s} containerRef={canvasRef} onMove={moveSticker} onRemove={removeSticker} isOwner={true}/>)}
+                {images.map(img=><DraggableItem key={img.id} item={img} containerRef={canvasRef} onMove={moveImage} onRemove={removeImage} isOwner={true}/>)}
+              </div>
+              <div>
+                <p style={{fontSize:12,color:"#aaa",marginBottom:6}}>Mood</p>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {MOODS.map(m=>(
+                    <button key={m} onClick={()=>setMood(mood===m?"":m)}
+                      style={{fontSize:22,background:mood===m?"rgba(244,167,185,0.3)":"transparent",
+                        border:mood===m?"2px solid #F4A7B9":"2px solid transparent",borderRadius:8,cursor:"pointer",padding:2}}>{m}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          {tab==="style" && (
+            <div style={{padding:16}}>
+              <p style={{fontSize:13,fontWeight:600,color:"#888",marginBottom:8}}>Paper Type</p>
+              <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+                {PAPER_TYPES.map(t=>(
+                  <button key={t} onClick={()=>setPaperType(t)} style={{
+                    padding:"6px 14px",borderRadius:999,
+                    background:paperType===t?"#F4A7B9":"rgba(244,167,185,0.15)",
+                    border:"none",cursor:"pointer",fontWeight:600,fontSize:13,
+                    color:paperType===t?"#fff":"#d4608a"
+                  }}>{t}</button>
+                ))}
+              </div>
+              <p style={{fontSize:13,fontWeight:600,color:"#888",marginBottom:8}}>Paper Color</p>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+                {PAPER_COLORS.map(c=>(
+                  <button key={c} onClick={()=>setPaperColor(c)} style={{
+                    width:32,height:32,borderRadius:"50%",background:c,
+                    border:paperColor===c?"3px solid #d4608a":"3px solid transparent",cursor:"pointer"
+                  }}/>
+                ))}
+              </div>
+              <p style={{fontSize:13,fontWeight:600,color:"#888",marginBottom:8}}>Privacy</p>
+              <div style={{display:"flex",gap:8}}>
+                {["private","friends"].map(p=>(
+                  <button key={p} onClick={()=>setPrivacy(p)} style={{
+                    padding:"6px 14px",borderRadius:999,
+                    background:privacy===p?"#C8A8E9":"rgba(200,168,233,0.15)",
+                    border:"none",cursor:"pointer",fontWeight:600,fontSize:13,
+                    color:privacy===p?"#fff":"#8a60c0"
+                  }}>{p==="private"?"🔒 Private":"👯 Friends"}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          {tab==="stickers" && (
+            <StickerCreator onAdd={sticker=>{ setStickers(prev=>[...prev,sticker]); setTab("write"); }}/>
+          )}
+          {tab==="images" && (
+            <div style={{padding:16}}>
+              <p style={{fontSize:13,color:"#888",marginBottom:12}}>Upload images to add to your diary entry. They'll appear as draggable elements.</p>
+              <FileUploadBtn onFile={handleImage} label="Add Image" color="#8ECFC4"/>
+              {images.length>0 && (
+                <div style={{marginTop:12}}>
+                  <p style={{fontSize:12,color:"#aaa",marginBottom:8}}>{images.length} image(s) added. Drag them on the canvas.</p>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    {images.map(img=>(
+                      <div key={img.id} style={{position:"relative"}}>
+                        <img src={img.url} alt="" style={{width:60,height:60,objectFit:"cover",borderRadius:8}}/>
+                        <button onClick={()=>removeImage(img.id)} style={{
+                          position:"absolute",top:-6,right:-6,background:"#ff6b6b",
+                          border:"none",borderRadius:"50%",width:18,height:18,
+                          cursor:"pointer",color:"#fff",fontSize:10,
+                          display:"flex",alignItems:"center",justifyContent:"center"
+                        }}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 20px",borderTop:"1px solid rgba(244,167,185,0.2)"}}>
+          <PillBtn onClick={()=>save(true)} color="#C8A8E9" variant="outline" style={{fontSize:13}}>Save Draft</PillBtn>
+          <PillBtn onClick={()=>save(false)} color="#F4A7B9"><Send size={14}/> Publish</PillBtn>
+        </div>
+      </GlassCard>
+    </div>
+  );
+};
+
+// ── Entry Card
+const EntryCard = ({ entry, members, currentMember, onLike, onComment, onDelete }) => {
+  const author = members.find(m=>m.id===entry.authorId);
+  const [showComments, setShowComments] = useState(false);
+  const [comment, setComment] = useState("");
+  const canvasRef = useRef();
+  const liked = entry.likes.includes(currentMember.id);
+  const isOwner = entry.authorId===currentMember.id;
+  const submitComment = () => {
+    if(!comment.trim()) return;
+    onComment(entry.id,{id:Date.now(),authorId:currentMember.id,text:comment,date:new Date().toISOString()});
+    setComment("");
+  };
+  if(!author) return null;
+  return (
+    <GlassCard className="fade-in" style={{marginBottom:16,overflow:"hidden"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <Avatar member={author} size={38}/>
+          <div>
+            <p style={{fontWeight:700,fontSize:14,color:"#555"}}>{author.name}</p>
+            <p style={{fontSize:11,color:"#bbb"}}>
+              {new Date(entry.date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}
+              {entry.mood && <span style={{marginLeft:6}}>{entry.mood}</span>}
+              {entry.isDraft && <span style={{marginLeft:6,background:"#ffe0e6",color:"#d4608a",padding:"1px 6px",borderRadius:8,fontSize:10}}>Draft</span>}
+            </p>
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:11,color:"#ccc"}}>{entry.privacy==="private"?"🔒":"👯"}</span>
+          {isOwner && (
+            <button onClick={()=>onDelete(entry.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#ffaaaa",opacity:0.7}}>
+              <Trash2 size={14}/>
+            </button>
+          )}
+        </div>
+      </div>
+      <div ref={canvasRef} style={{...paperStyle(entry.paperType,entry.paperColor),margin:"0 16px 12px",padding:16}}>
+        <h3 className="ds" style={{fontSize:20,color:"#d4608a",marginBottom:8}}>{entry.title}</h3>
+        <p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap"}}>{entry.body}</p>
+        {(entry.stickers||[]).map(s=><DraggableItem key={s.id} item={s} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
+        {(entry.images||[]).map(img=><DraggableItem key={img.id} item={img} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:16,padding:"8px 20px 12px"}}>
+        <button onClick={()=>onLike(entry.id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,color:liked?"#e05c8a":"#aaa",fontWeight:600,fontSize:13}}>
+          <Heart size={16} fill={liked?"#e05c8a":"none"} stroke={liked?"#e05c8a":"#aaa"}/>{entry.likes.length}
+        </button>
+        <button onClick={()=>setShowComments(!showComments)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,color:"#aaa",fontWeight:600,fontSize:13}}>
+          <MessageCircle size={16}/> {entry.comments.length}
+        </button>
+      </div>
+      {showComments && (
+        <div style={{borderTop:"1px solid rgba(244,167,185,0.15)",padding:"12px 16px"}}>
+          {entry.comments.map(c=>{
+            const cm=members.find(m=>m.id===c.authorId);
+            return cm?(
+              <div key={c.id} style={{display:"flex",gap:8,marginBottom:8}}>
+                <Avatar member={cm} size={28}/>
+                <div style={{background:"rgba(244,167,185,0.1)",borderRadius:12,padding:"6px 10px",flex:1}}>
+                  <p style={{fontSize:12,fontWeight:700,color:"#d4608a"}}>{cm.name}</p>
+                  <p style={{fontSize:13,color:"#555"}}>{c.text}</p>
+                </div>
+              </div>
+            ):null;
+          })}
+          <div style={{display:"flex",gap:8,marginTop:8}}>
+            <Avatar member={currentMember} size={28}/>
+            <div style={{flex:1,display:"flex",gap:6}}>
+              <input value={comment} onChange={e=>setComment(e.target.value)} placeholder="Write a comment…"
+                onKeyDown={e=>e.key==="Enter"&&submitComment()}
+                style={{flex:1,border:"1px solid rgba(244,167,185,0.3)",borderRadius:999,padding:"6px 12px",fontSize:13,outline:"none",background:"rgba(255,255,255,0.8)"}}/>
+              <button onClick={submitComment} style={{background:"#F4A7B9",border:"none",borderRadius:"50%",width:32,height:32,cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <Send size={12}/>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </GlassCard>
+  );
+};
+
+// ── Home Banner
+const HomeBanner = ({ bannerImage, onBannerChange }) => {
+  const fileRef = useRef();
+  const handle = e => {
+    const file=e.target.files[0];
+    if(!file) return;
+    const reader=new FileReader();
+    reader.onload=ev=>onBannerChange(ev.target.result);
+    reader.readAsDataURL(file);
+    e.target.value="";
+  };
+  return (
+    <div style={{position:"relative",borderRadius:24,overflow:"hidden",marginBottom:20,height:180,background:bannerImage?"transparent":"linear-gradient(135deg,#F4A7B9,#C8A8E9,#8ECFC4)"}}>
+      {bannerImage && <img src={bannerImage} alt="banner" style={{width:"100%",height:"100%",objectFit:"cover"}}/>}
+      <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.3))"}}/>
+      <div style={{position:"absolute",bottom:20,left:0,right:0,textAlign:"center"}}>
+        <h1 className="ds" style={{fontSize:42,color:"#fff",textShadow:"0 2px 12px rgba(0,0,0,0.3)"}}>Dear Diary</h1>
+      </div>
+      <button onClick={()=>fileRef.current.click()} style={{position:"absolute",top:12,right:12,background:"rgba(255,255,255,0.85)",border:"none",borderRadius:"50%",width:36,height:36,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
+        <Pencil size={15} color="#d4608a"/>
+      </button>
+      <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handle}/>
+    </div>
+  );
+};
+
+// ── Settings Page
+const SettingsPage = ({ member, onUpdate, onBack }) => {
+  const [name, setName] = useState(member.name);
+  const [bio, setBio] = useState(member.bio||"");
+  const [profilePic, setProfilePic] = useState(member.profilePic);
+  const [profileBanner, setProfileBanner] = useState(member.profileBanner);
+  const save = () => { onUpdate({...member,name,bio,profilePic,profileBanner}); onBack(); };
+  return (
+    <div style={{padding:16,paddingBottom:80}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+        <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",color:"#d4608a"}}><ChevronLeft size={24}/></button>
+        <h2 className="ds" style={{fontSize:26,color:"#d4608a"}}>Settings</h2>
+      </div>
+      <GlassCard style={{padding:20,marginBottom:16}}>
+        <h3 style={{fontSize:15,fontWeight:700,color:"#888",marginBottom:16}}>Profile Picture</h3>
+        <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:12}}>
+          <Avatar member={{...member,profilePic,name,avatar:member.avatar}} size={64}/>
+          <FileUploadBtn onFile={setProfilePic} label="Upload Photo" color="#F4A7B9"/>
+          {profilePic && <PillBtn onClick={()=>setProfilePic(null)} color="#ffaaaa" style={{fontSize:12}}>Remove</PillBtn>}
+        </div>
+      </GlassCard>
+      <GlassCard style={{padding:20,marginBottom:16}}>
+        <h3 style={{fontSize:15,fontWeight:700,color:"#888",marginBottom:16}}>Profile Banner</h3>
+        {profileBanner && <img src={profileBanner} alt="banner" style={{width:"100%",height:100,objectFit:"cover",borderRadius:12,marginBottom:10}}/>}
+        <div style={{display:"flex",gap:8}}>
+          <FileUploadBtn onFile={setProfileBanner} label="Upload Banner" color="#C8A8E9"/>
+          {profileBanner && <PillBtn onClick={()=>setProfileBanner(null)} color="#ffaaaa" style={{fontSize:12}}>Remove</PillBtn>}
+        </div>
+      </GlassCard>
+      <GlassCard style={{padding:20,marginBottom:16}}>
+        <h3 style={{fontSize:15,fontWeight:700,color:"#888",marginBottom:16}}>Profile Info</h3>
+        <label style={{fontSize:13,color:"#aaa",display:"block",marginBottom:4}}>Display Name</label>
+        <input value={name} onChange={e=>setName(e.target.value)}
+          style={{width:"100%",border:"1px solid rgba(244,167,185,0.3)",borderRadius:12,padding:"10px 14px",fontSize:15,outline:"none",marginBottom:12,background:"rgba(255,255,255,0.8)"}}/>
+        <label style={{fontSize:13,color:"#aaa",display:"block",marginBottom:4}}>Bio</label>
+        <textarea value={bio} onChange={e=>setBio(e.target.value)} rows={3}
+          style={{width:"100%",border:"1px solid rgba(244,167,185,0.3)",borderRadius:12,padding:"10px 14px",fontSize:14,outline:"none",resize:"none",background:"rgba(255,255,255,0.8)"}}/>
+      </GlassCard>
+      <PillBtn onClick={save} color="#F4A7B9" style={{width:"100%",justifyContent:"center",padding:"12px 20px"}}>Save Changes</PillBtn>
+    </div>
+  );
+};
+
+// ── Profile Page
+const ProfilePage = ({ member, entries, members, currentMember, onEdit, isOwn }) => {
+  const memberEntries = entries.filter(e=>e.authorId===member.id&&!e.isDraft&&(isOwn||e.privacy==="friends"));
+  return (
+    <div style={{paddingBottom:80}}>
+      {/* Banner */}
+      <div style={{height:140,background:member.profileBanner?"transparent":`linear-gradient(135deg, ${member.color}, #fff0f5)`,position:"relative",zIndex:0,overflow:"hidden"}}>
+        {member.profileBanner && <img src={member.profileBanner} alt="banner" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>}
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, transparent, rgba(0,0,0,0.15))",zIndex:1}}/>
+      </div>
+      {/* Avatar & info */}
+      <div style={{padding:"0 16px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginTop:-36,marginBottom:12,position:"relative",zIndex:2}}>
+          <Avatar member={member} size={72} style={{border:"3px solid #fff",boxShadow:"0 4px 12px rgba(0,0,0,0.15)"}}/>
+          {isOwn && (
+            <PillBtn onClick={onEdit} color={member.color} style={{fontSize:13}}>
+              <Settings size={13}/> Edit Profile
+            </PillBtn>
+          )}
+        </div>
+        <h2 style={{fontSize:20,fontWeight:700,color:"#444"}}>{member.name}</h2>
+        <p style={{fontSize:13,color:"#aaa",marginBottom:4}}>@{member.username}</p>
+        {member.bio && <p style={{fontSize:14,color:"#666",marginBottom:12}}>{member.bio}</p>}
+        <div style={{display:"flex",gap:20,marginBottom:16}}>
+          <div style={{textAlign:"center"}}>
+            <p style={{fontWeight:700,fontSize:18,color:"#555"}}>{memberEntries.length}</p>
+            <p style={{fontSize:11,color:"#aaa"}}>Entries</p>
+          </div>
+          <div style={{textAlign:"center"}}>
+            <p style={{fontWeight:700,fontSize:18,color:"#555"}}>{memberEntries.reduce((s,e)=>s+e.likes.length,0)}</p>
+            <p style={{fontSize:11,color:"#aaa"}}>Likes</p>
+          </div>
+        </div>
+      </div>
+      <div style={{padding:"0 16px"}}>
+        {memberEntries.length===0
+          ? <p style={{textAlign:"center",color:"#ccc",padding:32}}>No entries yet ✨</p>
+          : memberEntries.map(e=>(
+              <EntryCard key={e.id} entry={e} members={members} currentMember={currentMember}
+                onLike={()=>{}} onComment={()=>{}} onDelete={()=>{}}/>
+            ))
+        }
+      </div>
+    </div>
+  );
+};
+
+// ── Calendar Page
+const CalendarPage = ({ entries, members, currentMember }) => {
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [month, setMonth] = useState(new Date().getMonth());
+  const daysInMonth = new Date(year,month+1,0).getDate();
+  const firstDay = new Date(year,month,1).getDay();
+  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const dayNames = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+  const visibleEntries = entries.filter(e=>!e.isDraft&&(e.authorId===currentMember.id||e.privacy==="friends"));
+  const dayMembers = {};
+  visibleEntries.forEach(e=>{
+    const d=new Date(e.date);
+    if(d.getFullYear()===year&&d.getMonth()===month){
+      const day=d.getDate();
+      if(!dayMembers[day]) dayMembers[day]=new Set();
+      dayMembers[day].add(e.authorId);
+    }
+  });
+  const activityCount = {};
+  visibleEntries.forEach(e=>{
+    const d=new Date(e.date);
+    if(d.getFullYear()===year&&d.getMonth()===month)
+      activityCount[e.authorId]=(activityCount[e.authorId]||0)+1;
+  });
+  const mostActive = members.map(m=>({member:m,count:activityCount[m.id]||0})).sort((a,b)=>b.count-a.count).filter(x=>x.count>0);
+  const prev = () => { if(month===0){setMonth(11);setYear(y=>y-1);}else setMonth(m=>m-1); };
+  const next = () => { if(month===11){setMonth(0);setYear(y=>y+1);}else setMonth(m=>m+1); };
+  return (
+    <div style={{padding:16,paddingBottom:100}}>
+      <h2 className="ds" style={{fontSize:28,color:"#d4608a",marginBottom:16}}>Calendar</h2>
+      <GlassCard style={{padding:20,marginBottom:16}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+          <button onClick={prev} style={{background:"rgba(244,167,185,0.15)",border:"none",cursor:"pointer",color:"#d4608a",width:36,height:36,borderRadius:"50%",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
+          <h3 className="ds" style={{fontSize:22,color:"#d4608a"}}>{monthNames[month]} {year}</h3>
+          <button onClick={next} style={{background:"rgba(244,167,185,0.15)",border:"none",cursor:"pointer",color:"#d4608a",width:36,height:36,borderRadius:"50%",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,marginBottom:8}}>
+          {dayNames.map(d=><p key={d} style={{textAlign:"center",fontSize:11,color:"#c8a8e9",fontWeight:700}}>{d}</p>)}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:6}}>
+          {Array(firstDay).fill(null).map((_,i)=><div key={`e${i}`}/>)}
+          {Array(daysInMonth).fill(null).map((_,i)=>{
+            const day=i+1;
+            const memberIds=dayMembers[day]?[...dayMembers[day]]:[];
+            const hasEntry=memberIds.length>0;
+            const isToday=new Date().getDate()===day&&new Date().getMonth()===month&&new Date().getFullYear()===year;
+            return (
+              <div key={day} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"4px 2px",borderRadius:12,background:isToday?"linear-gradient(135deg,#F4A7B9,#C8A8E9)":hasEntry?"rgba(244,167,185,0.12)":"transparent"}}>
+                <span style={{fontSize:13,fontWeight:hasEntry||isToday?700:400,color:isToday?"#fff":hasEntry?"#d4608a":"#888"}}>{day}</span>
+                {hasEntry && (
+                  <div style={{display:"flex",gap:1,flexWrap:"wrap",justifyContent:"center"}}>
+                    {memberIds.slice(0,3).map(mid=>{
+                      const m=members.find(x=>x.id===mid);
+                      return m?(
+                        <div key={mid} style={{width:14,height:14,borderRadius:"50%",background:m.color,border:"1px solid #fff",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:7,fontWeight:700,color:"#fff"}}>
+                          {m.profilePic?<img src={m.profilePic} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:m.avatar}
+                        </div>
+                      ):null;
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </GlassCard>
+      {mostActive.length>0 && (
+        <GlassCard style={{padding:16}}>
+          <h3 style={{fontSize:14,fontWeight:700,color:"#d4608a",marginBottom:12}}>⭐ Most Active This Month</h3>
+          {mostActive.map(({member:m,count},idx)=>(
+            <div key={m.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+              <span style={{fontSize:16,width:24,textAlign:"center",color:"#d4608a",fontWeight:700}}>{idx===0?"🥇":idx===1?"🥈":idx===2?"🥉":`${idx+1}.`}</span>
+              <Avatar member={m} size={34}/>
+              <div style={{flex:1}}>
+                <p style={{fontSize:14,fontWeight:700,color:"#444"}}>{m.name}</p>
+                <div style={{height:6,borderRadius:999,background:"rgba(244,167,185,0.2)",marginTop:3,overflow:"hidden"}}>
+                  <div style={{height:"100%",borderRadius:999,background:`linear-gradient(90deg, ${m.color}, #F4A7B9)`,width:`${Math.min(100,(count/(mostActive[0]?.count||1))*100)}%`}}/>
+                </div>
+              </div>
+              <span style={{fontSize:13,fontWeight:700,color:"#d4608a"}}>{count}</span>
+            </div>
+          ))}
+        </GlassCard>
+      )}
+    </div>
+  );
+};
+
+// ── Media Page
+const MediaPage = ({ entries, members, currentMember }) => {
+  const allMedia = entries
+    .filter(e=>e.privacy==="friends"||e.authorId===currentMember.id)
+    .flatMap(e=>(e.images||[]).map(img=>({...img,entryId:e.id,authorId:e.authorId})));
+  return (
+    <div style={{padding:16,paddingBottom:80}}>
+      <h2 className="ds" style={{fontSize:28,color:"#d4608a",marginBottom:16}}>Media</h2>
+      {allMedia.length===0
+        ? <p style={{textAlign:"center",color:"#ccc",padding:32}}>No photos yet 📸</p>
+        : (
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+            {allMedia.map(img=>{
+              const author=members.find(m=>m.id===img.authorId);
+              return (
+                <div key={img.id} style={{position:"relative",borderRadius:16,overflow:"hidden",aspectRatio:"1"}}>
+                  <img src={img.url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  {author && (
+                    <div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(transparent,rgba(0,0,0,0.4))",padding:"4px 6px"}}>
+                      <Avatar member={author} size={18}/>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )
+      }
+    </div>
+  );
+};
+
+// ── Members Page
+const MembersPage = ({ members, currentMember, entries, onViewProfile }) => (
+  <div style={{padding:16,paddingBottom:80}}>
+    <h2 className="ds" style={{fontSize:28,color:"#d4608a",marginBottom:16}}>Members</h2>
+    {members.map(m=>(
+      <GlassCard key={m.id} style={{padding:16,marginBottom:12,cursor:"pointer"}} className="fade-in" onClick={()=>onViewProfile(m)}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <Avatar member={m} size={52}/>
+          <div style={{flex:1}}>
+            <p style={{fontWeight:700,fontSize:16,color:"#444"}}>{m.name}</p>
+            <p style={{fontSize:12,color:"#aaa"}}>@{m.username}</p>
+            {m.bio && <p style={{fontSize:13,color:"#888",marginTop:2}}>{m.bio}</p>}
+          </div>
+          <div style={{textAlign:"center"}}>
+            <p style={{fontWeight:700,color:"#d4608a"}}>{entries.filter(e=>e.authorId===m.id&&!e.isDraft).length}</p>
+            <p style={{fontSize:11,color:"#aaa"}}>entries</p>
+          </div>
+        </div>
+      </GlassCard>
+    ))}
+  </div>
+);
+
+// ── Notifications Panel
+const NotificationsPanel = ({ entries, members, currentMember, onClose }) => {
+  const notifs = entries
+    .filter(e=>e.authorId===currentMember.id)
+    .flatMap(e=>[
+      ...e.likes.filter(lid=>lid!==currentMember.id).map(lid=>({id:`like-${e.id}-${lid}`,type:"like",entry:e,actor:members.find(m=>m.id===lid),date:e.date})),
+      ...e.comments.filter(c=>c.authorId!==currentMember.id).map(c=>({id:`comment-${c.id}`,type:"comment",entry:e,actor:members.find(m=>m.id===c.authorId),comment:c,date:c.date}))
+    ])
+    .filter(n=>n.actor)
+    .sort((a,b)=>new Date(b.date)-new Date(a.date));
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.3)",zIndex:999}} onClick={onClose}>
+      <div style={{position:"absolute",top:60,right:16,width:300,background:"rgba(255,255,255,0.95)",borderRadius:20,boxShadow:"0 8px 32px rgba(244,167,185,0.3)",maxHeight:"70vh",overflowY:"auto"}}
+        onClick={e=>e.stopPropagation()}>
+        <div style={{padding:"16px 16px 12px",borderBottom:"1px solid rgba(244,167,185,0.2)"}}>
+          <h3 style={{fontSize:16,fontWeight:700,color:"#d4608a"}}>Notifications</h3>
+        </div>
+        {notifs.length===0
+          ? <p style={{textAlign:"center",color:"#ccc",padding:24,fontSize:14}}>No notifications yet</p>
+          : notifs.map(n=>(
+            <div key={n.id} style={{display:"flex",gap:10,padding:"12px 16px",borderBottom:"1px solid rgba(244,167,185,0.1)"}}>
+              <Avatar member={n.actor} size={36}/>
+              <div>
+                <p style={{fontSize:13,color:"#555"}}><strong>{n.actor.name}</strong>{" "}{n.type==="like"?"liked":"commented on"} your entry</p>
+                <p className="ds" style={{fontSize:13,color:"#d4608a"}}>{n.entry.title}</p>
+                {n.type==="comment" && <p style={{fontSize:12,color:"#888",fontStyle:"italic"}}>"{n.comment.text}"</p>}
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  );
+};
+
+// ── Login Page
+const LoginPage = ({ members, onLogin }) => {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const login = () => {
+    const m=members.find(m=>m.username===username.toLowerCase().trim()&&m.password===password);
+    if(m) onLogin(m);
+    else setError("Invalid username or password");
+  };
+  return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <PolkaBg/>
+      <GlassCard style={{width:"100%",maxWidth:360,padding:36}} className="pop">
+        <h1 className="ds" style={{fontSize:44,textAlign:"center",color:"#d4608a",marginBottom:4}}>Dear Diary</h1>
+        <p style={{textAlign:"center",fontSize:14,color:"#bbb",marginBottom:28}}>Your private space ✨</p>
+        <div style={{display:"flex",justifyContent:"center",gap:12,marginBottom:28}}>
+          {members.map(m=>(
+            <button key={m.id} onClick={()=>setUsername(m.username)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,background:"none",border:"none",cursor:"pointer"}}>
+              <Avatar member={m} size={50} style={{border:username===m.username?`3px solid ${m.color}`:"3px solid transparent"}}/>
+              <span style={{fontSize:12,color:username===m.username?m.color:"#aaa",fontWeight:600}}>{m.name}</span>
+            </button>
+          ))}
+        </div>
+        <div style={{marginBottom:14}}>
+          <label style={{fontSize:13,color:"#aaa",display:"block",marginBottom:4}}>Username</label>
+          <input value={username} onChange={e=>{setUsername(e.target.value);setError("");}} placeholder="e.g. hanoof" onKeyDown={e=>e.key==="Enter"&&login()}
+            style={{width:"100%",border:"1px solid rgba(244,167,185,0.4)",borderRadius:14,padding:"10px 16px",fontSize:15,outline:"none",background:"rgba(255,255,255,0.85)"}}/>
+        </div>
+        <div style={{marginBottom:20,position:"relative"}}>
+          <label style={{fontSize:13,color:"#aaa",display:"block",marginBottom:4}}>Password</label>
+          <input value={password} onChange={e=>{setPassword(e.target.value);setError("");}} type={showPass?"text":"password"} placeholder="••••" onKeyDown={e=>e.key==="Enter"&&login()}
+            style={{width:"100%",border:"1px solid rgba(244,167,185,0.4)",borderRadius:14,padding:"10px 40px 10px 16px",fontSize:15,outline:"none",background:"rgba(255,255,255,0.85)"}}/>
+          <button onClick={()=>setShowPass(!showPass)} style={{position:"absolute",right:12,top:30,background:"none",border:"none",cursor:"pointer",color:"#bbb"}}>
+            {showPass?<EyeOff size={16}/>:<Eye size={16}/>}
+          </button>
+        </div>
+        {error && <p style={{color:"#e05c8a",fontSize:13,textAlign:"center",marginBottom:12}}>{error}</p>}
+        <PillBtn onClick={login} color="#F4A7B9" style={{width:"100%",justifyContent:"center",padding:"12px"}}>Enter Diary ✨</PillBtn>
+      </GlassCard>
+    </div>
+  );
+};
+
+// ── Main App
+function App() {
+  const [members, setMembers] = useState(()=>lsLoad("dd_members",MEMBERS_INIT));
+  const [currentMember, setCurrentMember] = useState(()=>lsLoad("dd_currentMember",null));
+  const [entries, setEntries] = useState(()=>lsLoad("dd_entries",[]));
+  const [page, setPage] = useState("home");
+  const [showNewEntry, setShowNewEntry] = useState(false);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [homeBanner, setHomeBanner] = useState(()=>lsLoad("dd_banner",null));
+  const [viewingProfile, setViewingProfile] = useState(null);
+  const [editingSettings, setEditingSettings] = useState(false);
+
+  useEffect(()=>{lsSave("dd_members",members);},[members]);
+  useEffect(()=>{lsSave("dd_entries",entries);},[entries]);
+  useEffect(()=>{lsSave("dd_currentMember",currentMember);},[currentMember]);
+  useEffect(()=>{lsSave("dd_banner",homeBanner);},[homeBanner]);
+
+  const me = currentMember ? members.find(m=>m.id===currentMember.id) : null;
+  const saveEntry = entry => { setEntries(prev=>[entry,...prev]); setShowNewEntry(false); };
+  const deleteEntry = id => setEntries(prev=>prev.filter(e=>e.id!==id));
+  const likeEntry = id => {
+    setEntries(prev=>prev.map(e=>{
+      if(e.id!==id) return e;
+      const likes=e.likes.includes(me.id)?e.likes.filter(l=>l!==me.id):[...e.likes,me.id];
+      return {...e,likes};
+    }));
+  };
+  const commentEntry = (id,comment) => {
+    setEntries(prev=>prev.map(e=>e.id===id?{...e,comments:[...e.comments,comment]}:e));
+  };
+  const updateMember = updated => {
+    setMembers(prev=>prev.map(m=>m.id===updated.id?updated:m));
+    setCurrentMember(updated);
+  };
+  const logout = () => { setCurrentMember(null); setPage("home"); setViewingProfile(null); setEditingSettings(false); };
+  const notifCount = me ? entries
+    .filter(e=>e.authorId===me.id)
+    .reduce((sum,e)=>sum+e.likes.filter(l=>l!==me.id).length+e.comments.filter(c=>c.authorId!==me.id).length,0)
+    : 0;
+  const visibleEntries = entries.filter(e=>{
+    if(e.isDraft&&e.authorId!==me?.id) return false;
+    if(e.privacy==="private"&&e.authorId!==me?.id) return false;
+    if(searchQuery){ const q=searchQuery.toLowerCase(); return e.title.toLowerCase().includes(q)||e.body.toLowerCase().includes(q); }
+    return true;
+  });
+
+  if(!me) return (
+    <>
+      <PolkaBg/>
+      <LoginPage members={members} onLogin={m=>setCurrentMember(m)}/>
+    </>
+  );
+
+  if(editingSettings) return (
+    <>
+      <PolkaBg/>
+      <div style={{maxWidth:480,margin:"0 auto",minHeight:"100vh"}}>
+        <SettingsPage member={me} onUpdate={updateMember} onBack={()=>setEditingSettings(false)}/>
+      </div>
+    </>
+  );
+
+  if(viewingProfile) {
+    const isOwn = viewingProfile.id===me.id;
+    return (
+      <>
+        <PolkaBg/>
+        <div style={{maxWidth:480,margin:"0 auto",minHeight:"100vh"}}>
+          <div style={{position:"sticky",top:0,zIndex:100,background:"rgba(255,245,248,0.85)",backdropFilter:"blur(12px)",padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+            <button onClick={()=>setViewingProfile(null)} style={{background:"none",border:"none",cursor:"pointer",color:"#d4608a"}}><ChevronLeft size={24}/></button>
+            <span style={{fontWeight:700,color:"#444"}}>{viewingProfile.name}</span>
+          </div>
+          <ProfilePage
+            member={members.find(m=>m.id===viewingProfile.id)||viewingProfile}
+            entries={entries} members={members} currentMember={me}
+            onEdit={()=>{setEditingSettings(true);setViewingProfile(null);}}
+            isOwn={isOwn}/>
+        </div>
+      </>
+    );
+  }
+
+  const navItems = [
+    {id:"home",icon:<Home size={20}/>,label:"Home"},
+    {id:"diaries",icon:<BookOpen size={20}/>,label:"Diaries"},
+    {id:"media",icon:<Image size={20}/>,label:"Media"},
+    {id:"calendar",icon:<Calendar size={20}/>,label:"Calendar"},
+    {id:"members",icon:<Users size={20}/>,label:"Members"},
+  ];
+
+  return (
+    <>
+      <PolkaBg/>
+      <div style={{maxWidth:480,margin:"0 auto",minHeight:"100vh",position:"relative"}}>
+        {/* Top Bar */}
+        <div style={{position:"sticky",top:0,zIndex:100,background:"rgba(255,245,248,0.9)",backdropFilter:"blur(12px)",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid rgba(244,167,185,0.2)"}}>
+          <h1 className="ds" style={{fontSize:24,color:"#d4608a"}}>Dear Diary</h1>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            {showSearch && (
+              <input autoFocus value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} placeholder="Search entries…"
+                style={{border:"1px solid rgba(244,167,185,0.4)",borderRadius:999,padding:"6px 14px",fontSize:13,outline:"none",background:"rgba(255,255,255,0.85)"}}/>
+            )}
+            <button onClick={()=>{setShowSearch(!showSearch);if(showSearch)setSearchQuery("");}} style={{background:"none",border:"none",cursor:"pointer",color:"#d4608a"}}>
+              <Search size={20}/>
+            </button>
+            <button onClick={()=>setShowNotifs(!showNotifs)} style={{background:"none",border:"none",cursor:"pointer",color:"#d4608a",position:"relative"}}>
+              <Bell size={20}/>
+              {notifCount>0 && <span style={{position:"absolute",top:-4,right:-4,background:"#e05c8a",color:"#fff",borderRadius:"50%",width:16,height:16,fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>{notifCount}</span>}
+            </button>
+            <button onClick={()=>setViewingProfile(me)} style={{background:"none",border:"none",cursor:"pointer"}}>
+              <Avatar member={me} size={32}/>
+            </button>
+            <button onClick={logout} style={{background:"none",border:"none",cursor:"pointer",color:"#ccc"}}>
+              <LogOut size={18}/>
+            </button>
+          </div>
+        </div>
+
+        {/* Page Content */}
+        <div>
+          {page==="home" && (
+            <div style={{padding:16,paddingBottom:80}}>
+              <HomeBanner bannerImage={homeBanner} onBannerChange={setHomeBanner}/>
+              {entries.filter(e=>e.isDraft&&e.authorId===me.id).length>0 && (
+                <div style={{marginBottom:16}}>
+                  <h3 style={{fontSize:14,color:"#aaa",fontWeight:700,marginBottom:8}}>✏️ Drafts</h3>
+                  {entries.filter(e=>e.isDraft&&e.authorId===me.id).map(e=>(
+                    <EntryCard key={e.id} entry={e} members={members} currentMember={me}
+                      onLike={likeEntry} onComment={commentEntry} onDelete={deleteEntry}/>
+                  ))}
+                </div>
+              )}
+              {visibleEntries.filter(e=>!e.isDraft).length===0
+                ? <GlassCard style={{padding:40,textAlign:"center"}}>
+                    <p className="ds" style={{fontSize:24,color:"#d4608a",marginBottom:8}}>Start writing!</p>
+                    <p style={{color:"#bbb",fontSize:14}}>Tap the + button to create your first entry</p>
+                  </GlassCard>
+                : visibleEntries.filter(e=>!e.isDraft).map(e=>(
+                    <EntryCard key={e.id} entry={e} members={members} currentMember={me}
+                      onLike={likeEntry} onComment={commentEntry} onDelete={deleteEntry}/>
+                  ))
+              }
+            </div>
+          )}
+          {page==="diaries" && (
+            <div style={{padding:16,paddingBottom:100}}>
+              <h2 className="ds" style={{fontSize:28,color:"#d4608a",marginBottom:16}}>Diaries</h2>
+              {visibleEntries.filter(e=>!e.isDraft).length===0
+                ? <GlassCard style={{padding:40,textAlign:"center"}}>
+                    <p className="ds" style={{fontSize:24,color:"#d4608a",marginBottom:8}}>No entries yet</p>
+                    <p style={{color:"#bbb",fontSize:14}}>Be the first to write something ✨</p>
+                  </GlassCard>
+                : visibleEntries.filter(e=>!e.isDraft).map(e=>(
+                    <EntryCard key={e.id} entry={e} members={members} currentMember={me}
+                      onLike={likeEntry} onComment={commentEntry} onDelete={deleteEntry}/>
+                  ))
+              }
+            </div>
+          )}
+          {page==="media" && <MediaPage entries={entries} members={members} currentMember={me}/>}
+          {page==="calendar" && <CalendarPage entries={entries} members={members} currentMember={me}/>}
+          {page==="members" && <MembersPage members={members} currentMember={me} entries={entries} onViewProfile={m=>setViewingProfile(m)}/>}
+        </div>
+
+        {/* FAB */}
+        <button onClick={()=>setShowNewEntry(true)} style={{
+          position:"fixed",bottom:92,right:"max(16px, calc(50% - 224px))",
+          width:56,height:56,borderRadius:"50%",
+          background:"linear-gradient(135deg,#F4A7B9,#C8A8E9)",
+          border:"none",cursor:"pointer",color:"#fff",
+          display:"flex",alignItems:"center",justifyContent:"center",
+          boxShadow:"0 4px 20px rgba(244,167,185,0.5)",zIndex:90
+        }}>
+          <Plus size={24}/>
+        </button>
+
+        {/* Bottom Nav */}
+        <div style={{
+          position:"fixed",bottom:20,left:"50%",transform:"translateX(-50%)",
+          display:"flex",alignItems:"center",gap:4,
+          background:"rgba(255,255,255,0.92)",backdropFilter:"blur(20px)",
+          WebkitBackdropFilter:"blur(20px)",
+          borderRadius:999,
+          border:"1px solid rgba(244,167,185,0.3)",
+          boxShadow:"0 8px 32px rgba(244,167,185,0.25)",
+          padding:"6px 10px",zIndex:100
+        }}>
+          {navItems.map(n=>(
+            <button key={n.id} onClick={()=>setPage(n.id)} style={{
+              display:"flex",flexDirection:"column",alignItems:"center",gap:2,
+              padding:"7px 14px",borderRadius:999,border:"none",cursor:"pointer",
+              background:page===n.id?"#fff":"transparent",
+              boxShadow:page===n.id?"0 0 0 2px #F4A7B9":"none",
+              color:page===n.id?"#d4608a":"#bbb",
+              transition:"all 0.2s",minWidth:52
+            }}>
+              {n.icon}
+              <span style={{fontSize:9,fontWeight:700}}>{n.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {showNewEntry && <NewEntryModal member={me} members={members} onSave={saveEntry} onClose={()=>setShowNewEntry(false)}/>}
+        {showNotifs && <NotificationsPanel entries={entries} members={members} currentMember={me} onClose={()=>setShowNotifs(false)}/>}
+      </div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
