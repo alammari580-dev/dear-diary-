@@ -299,7 +299,7 @@ const NewEntryModal=({member,onSave,onClose})=>{
   );
 };
 
-const EntryCard=({entry,members,currentMember,onLike,onComment,onDelete,onLikeComment,onReplyComment,onLikeReply,highlighted=false})=>{
+const EntryCard=({entry,members,currentMember,onLike,onComment,onDelete,onLikeComment,onReplyComment,onLikeReply,highlighted=false,onCardClick,onAvatarClick})=>{
   const author=members.find(m=>m.id===entry.authorId);
   const[showComments,setShowComments]=useState(false);const[comment,setComment]=useState("");
   const canvasRef=useRef();
@@ -308,10 +308,10 @@ const EntryCard=({entry,members,currentMember,onLike,onComment,onDelete,onLikeCo
   if(!author)return null;
   return(
     <div data-entry-id={entry.id}>
-      <GlassCard className={`fade-in${highlighted?" entry-glow":""}`} style={{marginBottom:16,overflow:"hidden"}}>
+      <GlassCard className={`fade-in${highlighted?" entry-glow":""}`} style={{marginBottom:16,overflow:"hidden",cursor:onCardClick?"pointer":"default"}} onClick={onCardClick}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <Avatar member={author} size={38}/>
+            <div onClick={e=>{if(onAvatarClick){e.stopPropagation();onAvatarClick(author);}}}><Avatar member={author} size={38}/></div>
             <div>
               <p style={{fontWeight:700,fontSize:14,color:"#555"}}>{author.name}</p>
               <p style={{fontSize:11,color:"#bbb"}}>{new Date(entry.date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}{entry.mood&&<span style={{marginLeft:6}}>{entry.mood}</span>}{entry.isDraft&&<span style={{marginLeft:6,background:"#ffe0e6",color:"#d4608a",padding:"1px 6px",borderRadius:8,fontSize:10}}>Draft</span>}</p>
@@ -328,7 +328,7 @@ const EntryCard=({entry,members,currentMember,onLike,onComment,onDelete,onLikeCo
           {(entry.stickers||[]).map(s=><DraggableItem key={s.id} item={s} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
           {(entry.images||[]).map(img=><DraggableItem key={img.id} item={img} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:16,padding:"8px 20px 12px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:16,padding:"8px 20px 12px"}} onClick={e=>e.stopPropagation()}>
           <button onClick={()=>onLike(entry.id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,color:liked?"#e05c8a":"#aaa",fontWeight:600,fontSize:13}}>
             <Ico name="Heart" size={16} fill={liked?"#e05c8a":"none"} stroke={liked?"#e05c8a":"#aaa"}/>{entry.likes.length}
           </button>
@@ -336,7 +336,7 @@ const EntryCard=({entry,members,currentMember,onLike,onComment,onDelete,onLikeCo
             <Ico name="Msg" size={16}/> {entry.comments.length}
           </button>
         </div>
-        {showComments&&<div style={{borderTop:"1px solid rgba(244,167,185,0.15)",padding:"12px 16px"}}>
+        {showComments&&<div style={{borderTop:"1px solid rgba(244,167,185,0.15)",padding:"12px 16px"}} onClick={e=>e.stopPropagation()}>
           {entry.comments.map(c=><CommentItem key={c.id} comment={c} members={members} currentMember={currentMember} onLike={cid=>onLikeComment&&onLikeComment(cid)} onReply={(cid,text)=>onReplyComment&&onReplyComment(cid,text)} onLikeReply={(cid,rid)=>onLikeReply&&onLikeReply(cid,rid)} isReply={false}/>)}
           <div style={{display:"flex",gap:8,marginTop:8}}>
             <Avatar member={currentMember} size={28}/>
@@ -475,13 +475,13 @@ const CalendarPage=({entries,members,currentMember})=>{
   );
 };
 
-const MediaPage=({entries,members,currentMember})=>{
-  const allMedia=entries.filter(e=>e.privacy==="friends"||e.authorId===currentMember.id).flatMap(e=>(e.images||[]).map(img=>({...img,authorId:e.authorId})));
+const MediaPage=({entries,members,currentMember,onGoToEntry})=>{
+  const allMedia=entries.filter(e=>e.privacy==="friends"||e.authorId===currentMember.id).flatMap(e=>(e.images||[]).map(img=>({...img,authorId:e.authorId,entryId:e.id})));
   return<div style={{padding:16,paddingBottom:80}}>
     <h2 className="ds" style={{fontSize:28,color:"#d4608a",marginBottom:16}}>Media</h2>
     {allMedia.length===0?<p style={{textAlign:"center",color:"#ccc",padding:32}}>No photos yet 📸</p>:
     <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
-      {allMedia.map(img=>{const author=members.find(m=>m.id===img.authorId);return<div key={img.id} style={{position:"relative",borderRadius:16,overflow:"hidden",aspectRatio:"1"}}><img src={img.url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>{author&&<div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(transparent,rgba(0,0,0,0.4))",padding:"4px 6px"}}><Avatar member={author} size={18}/></div>}</div>;})}
+      {allMedia.map(img=>{const author=members.find(m=>m.id===img.authorId);return<div key={img.id} onClick={()=>onGoToEntry&&onGoToEntry(img.entryId)} style={{position:"relative",borderRadius:16,overflow:"hidden",aspectRatio:"1",cursor:"pointer"}}><img src={img.url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>{author&&<div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(transparent,rgba(0,0,0,0.4))",padding:"4px 6px"}}><Avatar member={author} size={18}/></div>}</div>;})}
     </div>}
   </div>;
 };
@@ -697,7 +697,7 @@ function App(){
   }
 
   const navItems=[{id:"home",icon:"Home",label:"Home"},{id:"diaries",icon:"Book",label:"Diaries"},{id:"media",icon:"Img",label:"Media"},{id:"calendar",icon:"Cal",label:"Calendar"},{id:"members",icon:"Users",label:"Members"}];
-  const eProps=e=>({key:e.id,entry:e,members,currentMember:me,onLike:likeEntry,onComment:commentEntry,onDelete:deleteEntry,onLikeComment:cid=>likeComment(e.id,cid),onReplyComment:(cid,text)=>replyToComment(e.id,cid,text),onLikeReply:(cid,rid)=>likeReply(e.id,cid,rid),highlighted:e.id===highlightEntryId});
+  const eProps=(e,withNav=false)=>({key:e.id,entry:e,members,currentMember:me,onLike:likeEntry,onComment:commentEntry,onDelete:deleteEntry,onLikeComment:cid=>likeComment(e.id,cid),onReplyComment:(cid,text)=>replyToComment(e.id,cid,text),onLikeReply:(cid,rid)=>likeReply(e.id,cid,rid),highlighted:e.id===highlightEntryId,...(withNav?{onCardClick:()=>setPage("diaries"),onAvatarClick:m=>setViewingProfile(m)}:{})});
 
   return<><PolkaBg/>
     <div style={{maxWidth:480,margin:"0 auto",minHeight:"100vh",position:"relative"}}>
@@ -719,17 +719,17 @@ function App(){
           <HomeBanner bannerImage={homeBanner} onBannerChange={updateBanner}/>
           {entries.filter(e=>e.isDraft&&e.authorId===me.id).length>0&&<div style={{marginBottom:16}}>
             <h3 style={{fontSize:14,color:"#aaa",fontWeight:700,marginBottom:8}}>✏️ Drafts</h3>
-            {entries.filter(e=>e.isDraft&&e.authorId===me.id).map(e=><EntryCard {...eProps(e)}/>)}
+            {entries.filter(e=>e.isDraft&&e.authorId===me.id).map(e=><EntryCard {...eProps(e,true)}/>)}
           </div>}
           {visible.filter(e=>!e.isDraft).length===0
             ?<GlassCard style={{padding:40,textAlign:"center"}}><p className="ds" style={{fontSize:24,color:"#d4608a",marginBottom:8}}>Start writing!</p><p style={{color:"#bbb",fontSize:14}}>Tap the + button to create your first entry</p></GlassCard>
-            :visible.filter(e=>!e.isDraft).map(e=><EntryCard {...eProps(e)}/>)}
+            :visible.filter(e=>!e.isDraft).map(e=><EntryCard {...eProps(e,true)}/>)}
         </div>}
         {page==="diaries"&&<div style={{padding:16,paddingBottom:100}}>
           <h2 className="ds" style={{fontSize:28,color:"#d4608a",marginBottom:16}}>Diaries</h2>
           {visible.filter(e=>!e.isDraft).length===0?<GlassCard style={{padding:40,textAlign:"center"}}><p className="ds" style={{fontSize:24,color:"#d4608a",marginBottom:8}}>No entries yet</p><p style={{color:"#bbb",fontSize:14}}>Be the first to write something ✨</p></GlassCard>:visible.filter(e=>!e.isDraft).map(e=><EntryCard {...eProps(e)}/>)}
         </div>}
-        {page==="media"&&<MediaPage entries={entries} members={members} currentMember={me}/>}
+        {page==="media"&&<MediaPage entries={entries} members={members} currentMember={me} onGoToEntry={id=>{goToEntry(id);setPage("diaries");}}/>}
         {page==="calendar"&&<CalendarPage entries={entries} members={members} currentMember={me}/>}
         {page==="members"&&<MembersPage members={members} entries={entries} onViewProfile={m=>setViewingProfile(m)}/>}
       </div>
