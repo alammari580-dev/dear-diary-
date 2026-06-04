@@ -15,7 +15,9 @@
     .ds{font-family:'Dancing Script',cursive;}
     @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
     @keyframes pop{0%{transform:scale(0.8);opacity:0}100%{transform:scale(1);opacity:1}}
+    @keyframes glow{0%,100%{box-shadow:0 0 0 2px #F4A7B9,0 4px 24px rgba(244,167,185,0.4)}50%{box-shadow:0 0 0 4px #F4A7B9,0 8px 32px rgba(244,167,185,0.6)}}
     .fade-in{animation:fadeIn 0.3s ease forwards;}.pop{animation:pop 0.2s ease forwards;}
+    .entry-glow{animation:glow 1s ease-in-out infinite;}
     input,textarea,button{font-family:'Nunito',sans-serif;}
   </style>
 </head>
@@ -24,7 +26,6 @@
 <script type="text/babel" data-presets="react">
 const { useState, useRef, useEffect } = React;
 
-// ── Inline SVG Icons (no external library needed)
 const Ico = ({ name, size=20, fill="none", color="currentColor", stroke }) => {
   const a = { width:size, height:size, viewBox:"0 0 24 24", fill, stroke:stroke||color, strokeWidth:2, strokeLinecap:"round", strokeLinejoin:"round" };
   const shapes = {
@@ -67,6 +68,15 @@ const MOODS=["😊","😢","😍","😤","😴","🥳","😌","🤔","😰","�
 const lsLoad=(k,fb)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb;}catch{return fb;}};
 const lsSave=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}};
 
+const fmtDate = (d) => {
+  const date = new Date(d), now = Date.now(), diff = now - date;
+  if(diff < 60000) return "just now";
+  if(diff < 3600000) return Math.floor(diff/60000) + "m ago";
+  if(diff < 86400000) return Math.floor(diff/3600000) + "h ago";
+  if(diff < 604800000) return Math.floor(diff/86400000) + "d ago";
+  return date.toLocaleDateString("en-US",{month:"short",day:"numeric"}) + " • " + date.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"});
+};
+
 const removeBackground=(dataUrl,tolerance)=>new Promise(resolve=>{
   const img=new window.Image();
   img.onload=()=>{
@@ -79,10 +89,7 @@ const removeBackground=(dataUrl,tolerance)=>new Promise(resolve=>{
     const avg=arr=>Math.round(arr.reduce((a,b)=>a+b,0)/arr.length);
     const samples=pts.map(([x,y])=>get(x,y));
     const bgR=avg(samples.map(s=>s[0])),bgG=avg(samples.map(s=>s[1])),bgB=avg(samples.map(s=>s[2]));
-    for(let i=0;i<px.length;i+=4){
-      const dist=Math.sqrt((px[i]-bgR)**2+(px[i+1]-bgG)**2+(px[i+2]-bgB)**2);
-      if(dist<tolerance)px[i+3]=0;else if(dist<tolerance+25)px[i+3]=Math.round(255*(dist-tolerance)/25);
-    }
+    for(let i=0;i<px.length;i+=4){const dist=Math.sqrt((px[i]-bgR)**2+(px[i+1]-bgG)**2+(px[i+2]-bgB)**2);if(dist<tolerance)px[i+3]=0;else if(dist<tolerance+25)px[i+3]=Math.round(255*(dist-tolerance)/25);}
     ctx.putImageData(d,0,0);resolve(canvas.toDataURL("image/png"));
   };img.src=dataUrl;
 });
@@ -95,8 +102,8 @@ const Avatar=({member,size=40,style={}})=>(
   </div>
 );
 
-const GlassCard=({children,style={},className="",onClick})=>(
-  <div className={className} onClick={onClick} style={{background:"rgba(255,255,255,0.7)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",borderRadius:24,border:"1px solid rgba(255,255,255,0.8)",boxShadow:"0 4px 24px rgba(244,167,185,0.12)",...style}}>{children}</div>
+const GlassCard=({children,style={},className="",onClick,...rest})=>(
+  <div className={className} onClick={onClick} style={{background:"rgba(255,255,255,0.7)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",borderRadius:24,border:"1px solid rgba(255,255,255,0.8)",boxShadow:"0 4px 24px rgba(244,167,185,0.12)",...style}} {...rest}>{children}</div>
 );
 
 const PillBtn=({children,onClick,color="#F4A7B9",textColor="#fff",style={},disabled=false,variant="fill"})=>(
@@ -129,6 +136,70 @@ const DraggableItem=({item,containerRef,onMove,onRemove,isOwner})=>{
     <div ref={ref} onMouseDown={startDrag} onTouchStart={startDrag} onDoubleClick={()=>isOwner&&onRemove(item.id)}
       style={{position:"absolute",left:`${item.x}%`,top:`${item.y}%`,cursor:isOwner?"grab":"default",userSelect:"none",zIndex:10,filter:"drop-shadow(0 2px 6px rgba(0,0,0,0.15))"}}>
       {isImage?<img src={src} alt="" style={{width:item.w||80,height:"auto",maxWidth:200,pointerEvents:"none",borderRadius:item.content?0:8}}/>:<span style={{fontSize:32}}>{src}</span>}
+    </div>
+  );
+};
+
+// ── CommentItem ───────────────────────────────────────────────────────────────
+const CommentItem = ({comment, members, currentMember, onLike, onReply, onLikeReply, isReply=false}) => {
+  const cm = members.find(m => m.id === comment.authorId);
+  const [showReply, setShowReply] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  if (!cm) return null;
+  const liked = (comment.likes||[]).includes(currentMember.id);
+  const likeCount = (comment.likes||[]).length;
+
+  const submitReply = () => {
+    if (!replyText.trim()) return;
+    onReply(comment.id, replyText.trim());
+    setReplyText("");
+    setShowReply(false);
+  };
+
+  return (
+    <div style={{marginBottom:8}}>
+      <div style={{display:"flex",gap:8}}>
+        <Avatar member={cm} size={isReply?22:28}/>
+        <div style={{flex:1}}>
+          <div style={{background:"rgba(244,167,185,0.1)",borderRadius:12,padding:"6px 10px"}}>
+            <p style={{fontSize:12,fontWeight:700,color:"#d4608a",marginBottom:2}}>{cm.name}</p>
+            <p style={{fontSize:13,color:"#555"}}>{comment.text}</p>
+          </div>
+          {/* Actions row */}
+          <div style={{display:"flex",alignItems:"center",gap:10,padding:"3px 6px",flexWrap:"wrap"}}>
+            <span style={{fontSize:10,color:"#c0b0b8"}}>{fmtDate(comment.date)}</span>
+            <button onClick={()=>onLike(comment.id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:3,color:liked?"#e05c8a":"#c0b0b8",fontSize:11,padding:0}}>
+              <Ico name="Heart" size={11} fill={liked?"#e05c8a":"none"} stroke={liked?"#e05c8a":"#c0b0b8"}/>
+              {likeCount>0&&<span style={{fontWeight:600}}>{likeCount}</span>}
+            </button>
+            {!isReply && (
+              <button onClick={()=>setShowReply(!showReply)} style={{background:"none",border:"none",cursor:"pointer",color:"#c0b0b8",fontSize:11,padding:0,fontWeight:600}}>
+                ↩ Reply
+              </button>
+            )}
+          </div>
+          {/* Reply input */}
+          {showReply && (
+            <div style={{display:"flex",gap:6,marginTop:4,marginBottom:4}}>
+              <input value={replyText} onChange={e=>setReplyText(e.target.value)} placeholder="Write a reply…"
+                onKeyDown={e=>e.key==="Enter"&&submitReply()}
+                style={{flex:1,border:"1px solid rgba(244,167,185,0.3)",borderRadius:999,padding:"5px 10px",fontSize:12,outline:"none",background:"rgba(255,255,255,0.8)"}}/>
+              <button onClick={submitReply} style={{background:"#F4A7B9",border:"none",borderRadius:"50%",width:28,height:28,cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <Ico name="Send" size={11} color="#fff"/>
+              </button>
+            </div>
+          )}
+          {/* Nested replies */}
+          {!isReply && (comment.replies||[]).length > 0 && (
+            <div style={{marginTop:6,paddingLeft:8,borderLeft:"2px solid rgba(244,167,185,0.25)"}}>
+              {(comment.replies||[]).map(r=>(
+                <CommentItem key={r.id} comment={r} members={members} currentMember={currentMember}
+                  onLike={rId=>onLikeReply(comment.id,rId)} onReply={()=>{}} onLikeReply={()=>{}} isReply={true}/>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
@@ -214,52 +285,72 @@ const NewEntryModal=({member,onSave,onClose})=>{
   );
 };
 
-const EntryCard=({entry,members,currentMember,onLike,onComment,onDelete})=>{
+// ── EntryCard ─────────────────────────────────────────────────────────────────
+const EntryCard=({entry,members,currentMember,onLike,onComment,onDelete,onLikeComment,onReplyComment,onLikeReply,highlighted=false})=>{
   const author=members.find(m=>m.id===entry.authorId);
   const[showComments,setShowComments]=useState(false);const[comment,setComment]=useState("");
   const canvasRef=useRef();
   const liked=entry.likes.includes(currentMember.id);const isOwner=entry.authorId===currentMember.id;
+
+  const submitComment=()=>{
+    if(!comment.trim())return;
+    onComment(entry.id,{id:Date.now(),authorId:currentMember.id,text:comment.trim(),date:new Date().toISOString(),likes:[],replies:[]});
+    setComment("");
+  };
+
   if(!author)return null;
   return(
-    <GlassCard className="fade-in" style={{marginBottom:16,overflow:"hidden"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px"}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <Avatar member={author} size={38}/>
-          <div>
-            <p style={{fontWeight:700,fontSize:14,color:"#555"}}>{author.name}</p>
-            <p style={{fontSize:11,color:"#bbb"}}>{new Date(entry.date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}{entry.mood&&<span style={{marginLeft:6}}>{entry.mood}</span>}{entry.isDraft&&<span style={{marginLeft:6,background:"#ffe0e6",color:"#d4608a",padding:"1px 6px",borderRadius:8,fontSize:10}}>Draft</span>}</p>
+    <div data-entry-id={entry.id}>
+      <GlassCard className={`fade-in${highlighted?" entry-glow":""}`} style={{marginBottom:16,overflow:"hidden",transition:"box-shadow 0.3s"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <Avatar member={author} size={38}/>
+            <div>
+              <p style={{fontWeight:700,fontSize:14,color:"#555"}}>{author.name}</p>
+              <p style={{fontSize:11,color:"#bbb"}}>{new Date(entry.date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}{entry.mood&&<span style={{marginLeft:6}}>{entry.mood}</span>}{entry.isDraft&&<span style={{marginLeft:6,background:"#ffe0e6",color:"#d4608a",padding:"1px 6px",borderRadius:8,fontSize:10}}>Draft</span>}</p>
+            </div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:11,color:"#ccc"}}>{entry.privacy==="private"?"🔒":"👯"}</span>
+            {isOwner&&<button onClick={()=>onDelete(entry.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#ffaaaa",opacity:0.7}}><Ico name="Trash" size={14}/></button>}
           </div>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:11,color:"#ccc"}}>{entry.privacy==="private"?"🔒":"👯"}</span>
-          {isOwner&&<button onClick={()=>onDelete(entry.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#ffaaaa",opacity:0.7}}><Ico name="Trash" size={14}/></button>}
+        <div ref={canvasRef} style={{...paperStyle(entry.paperType,entry.paperColor),margin:"0 16px 12px",padding:16}}>
+          <h3 className="ds" style={{fontSize:20,color:"#d4608a",marginBottom:8}}>{entry.title}</h3>
+          <p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap"}}>{entry.body}</p>
+          {(entry.stickers||[]).map(s=><DraggableItem key={s.id} item={s} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
+          {(entry.images||[]).map(img=><DraggableItem key={img.id} item={img} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
         </div>
-      </div>
-      <div ref={canvasRef} style={{...paperStyle(entry.paperType,entry.paperColor),margin:"0 16px 12px",padding:16}}>
-        <h3 className="ds" style={{fontSize:20,color:"#d4608a",marginBottom:8}}>{entry.title}</h3>
-        <p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap"}}>{entry.body}</p>
-        {(entry.stickers||[]).map(s=><DraggableItem key={s.id} item={s} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
-        {(entry.images||[]).map(img=><DraggableItem key={img.id} item={img} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
-      </div>
-      <div style={{display:"flex",alignItems:"center",gap:16,padding:"8px 20px 12px"}}>
-        <button onClick={()=>onLike(entry.id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,color:liked?"#e05c8a":"#aaa",fontWeight:600,fontSize:13}}>
-          <Ico name="Heart" size={16} fill={liked?"#e05c8a":"none"} stroke={liked?"#e05c8a":"#aaa"}/>{entry.likes.length}
-        </button>
-        <button onClick={()=>setShowComments(!showComments)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,color:"#aaa",fontWeight:600,fontSize:13}}>
-          <Ico name="Msg" size={16}/> {entry.comments.length}
-        </button>
-      </div>
-      {showComments&&<div style={{borderTop:"1px solid rgba(244,167,185,0.15)",padding:"12px 16px"}}>
-        {entry.comments.map(c=>{const cm=members.find(m=>m.id===c.authorId);return cm?<div key={c.id} style={{display:"flex",gap:8,marginBottom:8}}><Avatar member={cm} size={28}/><div style={{background:"rgba(244,167,185,0.1)",borderRadius:12,padding:"6px 10px",flex:1}}><p style={{fontSize:12,fontWeight:700,color:"#d4608a"}}>{cm.name}</p><p style={{fontSize:13,color:"#555"}}>{c.text}</p></div></div>:null;})}
-        <div style={{display:"flex",gap:8,marginTop:8}}>
-          <Avatar member={currentMember} size={28}/>
-          <div style={{flex:1,display:"flex",gap:6}}>
-            <input value={comment} onChange={e=>setComment(e.target.value)} placeholder="Write a comment…" onKeyDown={e=>{if(e.key==="Enter"&&comment.trim()){onComment(entry.id,{id:Date.now(),authorId:currentMember.id,text:comment,date:new Date().toISOString()});setComment("");}}} style={{flex:1,border:"1px solid rgba(244,167,185,0.3)",borderRadius:999,padding:"6px 12px",fontSize:13,outline:"none",background:"rgba(255,255,255,0.8)"}}/>
-            <button onClick={()=>{if(comment.trim()){onComment(entry.id,{id:Date.now(),authorId:currentMember.id,text:comment,date:new Date().toISOString()});setComment("");}}} style={{background:"#F4A7B9",border:"none",borderRadius:"50%",width:32,height:32,cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}><Ico name="Send" size={12}/></button>
+        <div style={{display:"flex",alignItems:"center",gap:16,padding:"8px 20px 12px"}}>
+          <button onClick={()=>onLike(entry.id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,color:liked?"#e05c8a":"#aaa",fontWeight:600,fontSize:13}}>
+            <Ico name="Heart" size={16} fill={liked?"#e05c8a":"none"} stroke={liked?"#e05c8a":"#aaa"}/>{entry.likes.length}
+          </button>
+          <button onClick={()=>setShowComments(!showComments)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,color:"#aaa",fontWeight:600,fontSize:13}}>
+            <Ico name="Msg" size={16}/> {entry.comments.length}
+          </button>
+        </div>
+        {showComments&&<div style={{borderTop:"1px solid rgba(244,167,185,0.15)",padding:"12px 16px"}}>
+          {entry.comments.map(c=>(
+            <CommentItem key={c.id} comment={c} members={members} currentMember={currentMember}
+              onLike={cid=>onLikeComment&&onLikeComment(cid)}
+              onReply={(cid,text)=>onReplyComment&&onReplyComment(cid,text)}
+              onLikeReply={(cid,rid)=>onLikeReply&&onLikeReply(cid,rid)}
+              isReply={false}/>
+          ))}
+          <div style={{display:"flex",gap:8,marginTop:8}}>
+            <Avatar member={currentMember} size={28}/>
+            <div style={{flex:1,display:"flex",gap:6}}>
+              <input value={comment} onChange={e=>setComment(e.target.value)} placeholder="Write a comment…"
+                onKeyDown={e=>e.key==="Enter"&&submitComment()}
+                style={{flex:1,border:"1px solid rgba(244,167,185,0.3)",borderRadius:999,padding:"6px 12px",fontSize:13,outline:"none",background:"rgba(255,255,255,0.8)"}}/>
+              <button onClick={submitComment} style={{background:"#F4A7B9",border:"none",borderRadius:"50%",width:32,height:32,cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,zIndex:10,position:"relative"}}>
+                <Ico name="Send" size={12} color="#fff"/>
+              </button>
+            </div>
           </div>
-        </div>
-      </div>}
-    </GlassCard>
+        </div>}
+      </GlassCard>
+    </div>
   );
 };
 
@@ -335,7 +426,7 @@ const ProfilePage=({member,entries,members,currentMember,onEdit,isOwn})=>{
         </div>
       </div>
       <div style={{padding:"0 16px"}}>
-        {memberEntries.length===0?<p style={{textAlign:"center",color:"#ccc",padding:32}}>No entries yet ✨</p>:memberEntries.map(e=><EntryCard key={e.id} entry={e} members={members} currentMember={currentMember} onLike={()=>{}} onComment={()=>{}} onDelete={()=>{}}/>)}
+        {memberEntries.length===0?<p style={{textAlign:"center",color:"#ccc",padding:32}}>No entries yet ✨</p>:memberEntries.map(e=><EntryCard key={e.id} entry={e} members={members} currentMember={currentMember} onLike={()=>{}} onComment={()=>{}} onDelete={()=>{}} onLikeComment={()=>{}} onReplyComment={()=>{}} onLikeReply={()=>{}}/>)}
       </div>
     </div>
   );
@@ -411,14 +502,43 @@ const MembersPage=({members,entries,onViewProfile})=>(
   </div>
 );
 
-const NotificationsPanel=({entries,members,currentMember,onClose})=>{
-  const notifs=entries.filter(e=>e.authorId===currentMember.id).flatMap(e=>[...e.likes.filter(l=>l!==currentMember.id).map(l=>({id:`l${e.id}${l}`,type:"like",entry:e,actor:members.find(m=>m.id===l),date:e.date})),...e.comments.filter(c=>c.authorId!==currentMember.id).map(c=>({id:`c${c.id}`,type:"comment",entry:e,actor:members.find(m=>m.id===c.authorId),comment:c,date:c.date}))]).filter(n=>n.actor).sort((a,b)=>new Date(b.date)-new Date(a.date));
-  return<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.3)",zIndex:999}} onClick={onClose}>
-    <div style={{position:"absolute",top:60,right:16,width:300,background:"rgba(255,255,255,0.95)",borderRadius:20,boxShadow:"0 8px 32px rgba(244,167,185,0.3)",maxHeight:"70vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-      <div style={{padding:"16px 16px 12px",borderBottom:"1px solid rgba(244,167,185,0.2)"}}><h3 style={{fontSize:16,fontWeight:700,color:"#d4608a"}}>Notifications</h3></div>
-      {notifs.length===0?<p style={{textAlign:"center",color:"#ccc",padding:24,fontSize:14}}>No notifications yet</p>:notifs.map(n=><div key={n.id} style={{display:"flex",gap:10,padding:"12px 16px",borderBottom:"1px solid rgba(244,167,185,0.1)"}}><Avatar member={n.actor} size={36}/><div><p style={{fontSize:13,color:"#555"}}><strong>{n.actor.name}</strong> {n.type==="like"?"liked":"commented on"} your entry</p><p className="ds" style={{fontSize:13,color:"#d4608a"}}>{n.entry.title}</p>{n.type==="comment"&&<p style={{fontSize:12,color:"#888",fontStyle:"italic"}}>"{n.comment.text}"</p>}</div></div>)}
+// ── NotificationsPanel ────────────────────────────────────────────────────────
+const NotificationsPanel=({entries,members,currentMember,onClose,readNotifIds,onMarkRead,onGoToEntry})=>{
+  const notifs=entries.filter(e=>e.authorId===currentMember.id).flatMap(e=>[
+    ...e.likes.filter(l=>l!==currentMember.id).map(l=>({id:`l${e.id}${l}`,type:"like",entry:e,actor:members.find(m=>m.id===l),date:e.date})),
+    ...e.comments.filter(c=>c.authorId!==currentMember.id).map(c=>({id:`c${c.id}`,type:"comment",entry:e,actor:members.find(m=>m.id===c.authorId),comment:c,date:c.date}))
+  ]).filter(n=>n.actor).sort((a,b)=>new Date(b.date)-new Date(a.date));
+
+  // Mark all as read after 1.5s
+  useEffect(()=>{
+    const t=setTimeout(()=>{ onMarkRead(notifs.map(n=>n.id)); },1500);
+    return()=>clearTimeout(t);
+  },[]);
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.3)",zIndex:999}} onClick={onClose}>
+      <div style={{position:"absolute",top:60,right:16,width:310,background:"rgba(255,255,255,0.97)",borderRadius:20,boxShadow:"0 8px 32px rgba(244,167,185,0.3)",maxHeight:"70vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <div style={{padding:"16px 16px 12px",borderBottom:"1px solid rgba(244,167,185,0.2)"}}><h3 style={{fontSize:16,fontWeight:700,color:"#d4608a"}}>Notifications</h3></div>
+        {notifs.length===0?<p style={{textAlign:"center",color:"#ccc",padding:24,fontSize:14}}>No notifications yet</p>:notifs.map(n=>{
+          const isUnread=!readNotifIds.has(n.id);
+          return(
+            <div key={n.id} onClick={()=>{ onGoToEntry(n.entry.id); onClose(); }}
+              style={{display:"flex",gap:10,padding:"12px 16px",borderBottom:"1px solid rgba(244,167,185,0.1)",cursor:"pointer",background:isUnread?"rgba(244,167,185,0.08)":"transparent",transition:"background 0.3s",alignItems:"flex-start"}}>
+              {/* Unread dot */}
+              <div style={{width:8,height:8,borderRadius:"50%",background:isUnread?"#e05c8a":"transparent",flexShrink:0,marginTop:6,transition:"background 0.3s"}}/>
+              <Avatar member={n.actor} size={36}/>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{fontSize:13,color:"#555"}}><strong>{n.actor.name}</strong> {n.type==="like"?"liked":"commented on"} your entry</p>
+                <p className="ds" style={{fontSize:13,color:"#d4608a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{n.entry.title}</p>
+                {n.type==="comment"&&<p style={{fontSize:12,color:"#888",fontStyle:"italic",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>"{n.comment.text}"</p>}
+                <p style={{fontSize:10,color:"#c0b0b8",marginTop:2}}>{fmtDate(n.date)}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
-  </div>;
+  );
 };
 
 const LoginPage=({members,onLogin})=>{
@@ -448,6 +568,7 @@ const LoginPage=({members,onLogin})=>{
   </div>;
 };
 
+// ── Main App ──────────────────────────────────────────────────────────────────
 function App(){
   const[members,setMembers]=useState(()=>lsLoad("dd_members",MEMBERS_INIT));
   const[currentMember,setCurrentMember]=useState(()=>lsLoad("dd_currentMember",null));
@@ -460,21 +581,98 @@ function App(){
   const[homeBanner,setHomeBanner]=useState(()=>lsLoad("dd_banner",null));
   const[viewingProfile,setViewingProfile]=useState(null);
   const[editingSettings,setEditingSettings]=useState(false);
+  const[readNotifIds,setReadNotifIds]=useState(()=>new Set(lsLoad("dd_readNotifs",[])));
+  const[highlightEntryId,setHighlightEntryId]=useState(null);
+  const[inputFocused,setInputFocused]=useState(false);
 
   useEffect(()=>{lsSave("dd_members",members);},[members]);
   useEffect(()=>{lsSave("dd_entries",entries);},[entries]);
   useEffect(()=>{lsSave("dd_currentMember",currentMember);},[currentMember]);
   useEffect(()=>{lsSave("dd_banner",homeBanner);},[homeBanner]);
+  useEffect(()=>{lsSave("dd_readNotifs",[...readNotifIds]);},[readNotifIds]);
+
+  // Hide FAB when any input/textarea is focused
+  useEffect(()=>{
+    const onIn=e=>{if(["INPUT","TEXTAREA"].includes(e.target.tagName))setInputFocused(true);};
+    const onOut=e=>{if(["INPUT","TEXTAREA"].includes(e.target.tagName))setInputFocused(false);};
+    window.addEventListener("focusin",onIn);
+    window.addEventListener("focusout",onOut);
+    return()=>{window.removeEventListener("focusin",onIn);window.removeEventListener("focusout",onOut);};
+  },[]);
+
+  // Scroll & highlight entry from notification
+  useEffect(()=>{
+    if(!highlightEntryId)return;
+    const t=setTimeout(()=>{
+      const el=document.querySelector('[data-entry-id="'+highlightEntryId+'"]');
+      if(el)el.scrollIntoView({behavior:"smooth",block:"center"});
+    },150);
+    const c=setTimeout(()=>setHighlightEntryId(null),3500);
+    return()=>{clearTimeout(t);clearTimeout(c);};
+  },[highlightEntryId]);
 
   const me=currentMember?members.find(m=>m.id===currentMember.id):null;
+
   const saveEntry=entry=>{setEntries(p=>[entry,...p]);setShowNewEntry(false);};
   const deleteEntry=id=>setEntries(p=>p.filter(e=>e.id!==id));
   const likeEntry=id=>setEntries(p=>p.map(e=>{if(e.id!==id)return e;const likes=e.likes.includes(me.id)?e.likes.filter(l=>l!==me.id):[...e.likes,me.id];return{...e,likes};}));
   const commentEntry=(id,comment)=>setEntries(p=>p.map(e=>e.id===id?{...e,comments:[...e.comments,comment]}:e));
   const updateMember=updated=>{setMembers(p=>p.map(m=>m.id===updated.id?updated:m));setCurrentMember(updated);};
   const logout=()=>{setCurrentMember(null);setPage("home");setViewingProfile(null);setEditingSettings(false);};
-  const notifCount=me?entries.filter(e=>e.authorId===me.id).reduce((s,e)=>s+e.likes.filter(l=>l!==me.id).length+e.comments.filter(c=>c.authorId!==me.id).length,0):0;
-  const visible=entries.filter(e=>{if(e.isDraft&&e.authorId!==me?.id)return false;if(e.privacy==="private"&&e.authorId!==me?.id)return false;if(searchQuery){const q=searchQuery.toLowerCase();return e.title.toLowerCase().includes(q)||e.body.toLowerCase().includes(q);}return true;});
+
+  // Comment likes & replies
+  const likeComment=(entryId,commentId)=>{
+    setEntries(p=>p.map(e=>{
+      if(e.id!==entryId)return e;
+      return{...e,comments:e.comments.map(c=>{
+        if(c.id!==commentId)return c;
+        const likes=(c.likes||[]).includes(me.id)?(c.likes||[]).filter(l=>l!==me.id):[...(c.likes||[]),me.id];
+        return{...c,likes};
+      })};
+    }));
+  };
+  const replyToComment=(entryId,commentId,text)=>{
+    setEntries(p=>p.map(e=>{
+      if(e.id!==entryId)return e;
+      return{...e,comments:e.comments.map(c=>{
+        if(c.id!==commentId)return c;
+        const reply={id:Date.now(),authorId:me.id,text,date:new Date().toISOString(),likes:[]};
+        return{...c,replies:[...(c.replies||[]),reply]};
+      })};
+    }));
+  };
+  const likeReply=(entryId,commentId,replyId)=>{
+    setEntries(p=>p.map(e=>{
+      if(e.id!==entryId)return e;
+      return{...e,comments:e.comments.map(c=>{
+        if(c.id!==commentId)return c;
+        return{...c,replies:(c.replies||[]).map(r=>{
+          if(r.id!==replyId)return r;
+          const likes=(r.likes||[]).includes(me.id)?(r.likes||[]).filter(l=>l!==me.id):[...(r.likes||[]),me.id];
+          return{...r,likes};
+        })};
+      })};
+    }));
+  };
+
+  const markNotifsRead=(ids)=>setReadNotifIds(prev=>new Set([...prev,...ids]));
+  const goToEntry=(entryId)=>{setShowNotifs(false);setPage("home");setHighlightEntryId(entryId);};
+
+  // Only count unread notifications
+  const notifCount=me?(()=>{
+    const allIds=entries.filter(e=>e.authorId===me.id).flatMap(e=>[
+      ...e.likes.filter(l=>l!==me.id).map(l=>`l${e.id}${l}`),
+      ...e.comments.filter(c=>c.authorId!==me.id).map(c=>`c${c.id}`)
+    ]);
+    return allIds.filter(id=>!readNotifIds.has(id)).length;
+  })():0;
+
+  const visible=entries.filter(e=>{
+    if(e.isDraft&&e.authorId!==me?.id)return false;
+    if(e.privacy==="private"&&e.authorId!==me?.id)return false;
+    if(searchQuery){const q=searchQuery.toLowerCase();return e.title.toLowerCase().includes(q)||e.body.toLowerCase().includes(q);}
+    return true;
+  });
 
   if(!me)return<><PolkaBg/><LoginPage members={members} onLogin={m=>setCurrentMember(m)}/></>;
   if(editingSettings)return<><PolkaBg/><div style={{maxWidth:480,margin:"0 auto",minHeight:"100vh"}}><SettingsPage member={me} onUpdate={updateMember} onBack={()=>setEditingSettings(false)}/></div></>;
@@ -491,8 +689,18 @@ function App(){
 
   const navItems=[{id:"home",icon:"Home",label:"Home"},{id:"diaries",icon:"Book",label:"Diaries"},{id:"media",icon:"Img",label:"Media"},{id:"calendar",icon:"Cal",label:"Calendar"},{id:"members",icon:"Users",label:"Members"}];
 
+  const entryCardProps=(e)=>({
+    key:e.id, entry:e, members, currentMember:me,
+    onLike:likeEntry, onComment:commentEntry, onDelete:deleteEntry,
+    onLikeComment:(cid)=>likeComment(e.id,cid),
+    onReplyComment:(cid,text)=>replyToComment(e.id,cid,text),
+    onLikeReply:(cid,rid)=>likeReply(e.id,cid,rid),
+    highlighted:e.id===highlightEntryId
+  });
+
   return<><PolkaBg/>
     <div style={{maxWidth:480,margin:"0 auto",minHeight:"100vh",position:"relative"}}>
+      {/* Top Bar */}
       <div style={{position:"sticky",top:0,zIndex:100,background:"rgba(255,245,248,0.9)",backdropFilter:"blur(12px)",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid rgba(244,167,185,0.2)"}}>
         <h1 className="ds" style={{fontSize:24,color:"#d4608a"}}>Dear Diary</h1>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -507,30 +715,33 @@ function App(){
         </div>
       </div>
 
+      {/* Pages */}
       <div>
         {page==="home"&&<div style={{padding:16,paddingBottom:80}}>
           <HomeBanner bannerImage={homeBanner} onBannerChange={setHomeBanner}/>
           {entries.filter(e=>e.isDraft&&e.authorId===me.id).length>0&&<div style={{marginBottom:16}}>
             <h3 style={{fontSize:14,color:"#aaa",fontWeight:700,marginBottom:8}}>✏️ Drafts</h3>
-            {entries.filter(e=>e.isDraft&&e.authorId===me.id).map(e=><EntryCard key={e.id} entry={e} members={members} currentMember={me} onLike={likeEntry} onComment={commentEntry} onDelete={deleteEntry}/>)}
+            {entries.filter(e=>e.isDraft&&e.authorId===me.id).map(e=><EntryCard {...entryCardProps(e)}/>)}
           </div>}
           {visible.filter(e=>!e.isDraft).length===0
             ?<GlassCard style={{padding:40,textAlign:"center"}}><p className="ds" style={{fontSize:24,color:"#d4608a",marginBottom:8}}>Start writing!</p><p style={{color:"#bbb",fontSize:14}}>Tap the + button to create your first entry</p></GlassCard>
-            :visible.filter(e=>!e.isDraft).map(e=><EntryCard key={e.id} entry={e} members={members} currentMember={me} onLike={likeEntry} onComment={commentEntry} onDelete={deleteEntry}/>)}
+            :visible.filter(e=>!e.isDraft).map(e=><EntryCard {...entryCardProps(e)}/>)}
         </div>}
         {page==="diaries"&&<div style={{padding:16,paddingBottom:100}}>
           <h2 className="ds" style={{fontSize:28,color:"#d4608a",marginBottom:16}}>Diaries</h2>
-          {visible.filter(e=>!e.isDraft).length===0?<GlassCard style={{padding:40,textAlign:"center"}}><p className="ds" style={{fontSize:24,color:"#d4608a",marginBottom:8}}>No entries yet</p><p style={{color:"#bbb",fontSize:14}}>Be the first to write something ✨</p></GlassCard>:visible.filter(e=>!e.isDraft).map(e=><EntryCard key={e.id} entry={e} members={members} currentMember={me} onLike={likeEntry} onComment={commentEntry} onDelete={deleteEntry}/>)}
+          {visible.filter(e=>!e.isDraft).length===0?<GlassCard style={{padding:40,textAlign:"center"}}><p className="ds" style={{fontSize:24,color:"#d4608a",marginBottom:8}}>No entries yet</p><p style={{color:"#bbb",fontSize:14}}>Be the first to write something ✨</p></GlassCard>:visible.filter(e=>!e.isDraft).map(e=><EntryCard {...entryCardProps(e)}/>)}
         </div>}
         {page==="media"&&<MediaPage entries={entries} members={members} currentMember={me}/>}
         {page==="calendar"&&<CalendarPage entries={entries} members={members} currentMember={me}/>}
         {page==="members"&&<MembersPage members={members} entries={entries} onViewProfile={m=>setViewingProfile(m)}/>}
       </div>
 
-      <button onClick={()=>setShowNewEntry(true)} style={{position:"fixed",bottom:92,right:"max(16px, calc(50% - 224px))",width:56,height:56,borderRadius:"50%",background:"linear-gradient(135deg,#F4A7B9,#C8A8E9)",border:"none",cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 20px rgba(244,167,185,0.5)",zIndex:90}}>
+      {/* FAB — hidden when input focused */}
+      {!inputFocused&&<button onClick={()=>setShowNewEntry(true)} style={{position:"fixed",bottom:92,right:"max(16px, calc(50% - 224px))",width:56,height:56,borderRadius:"50%",background:"linear-gradient(135deg,#F4A7B9,#C8A8E9)",border:"none",cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 20px rgba(244,167,185,0.5)",zIndex:90}}>
         <Ico name="Plus" size={24} color="#fff"/>
-      </button>
+      </button>}
 
+      {/* Bottom Nav */}
       <div style={{position:"fixed",bottom:20,left:"50%",transform:"translateX(-50%)",display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.92)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",borderRadius:999,border:"1px solid rgba(244,167,185,0.3)",boxShadow:"0 8px 32px rgba(244,167,185,0.25)",padding:"6px 10px",zIndex:100}}>
         {navItems.map(n=><button key={n.id} onClick={()=>setPage(n.id)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"7px 14px",borderRadius:999,border:"none",cursor:"pointer",background:page===n.id?"#fff":"transparent",boxShadow:page===n.id?"0 0 0 2px #F4A7B9":"none",color:page===n.id?"#d4608a":"#bbb",transition:"all 0.2s",minWidth:52}}>
           <Ico name={n.icon} size={20} color={page===n.id?"#d4608a":"#bbb"}/><span style={{fontSize:9,fontWeight:700}}>{n.label}</span>
@@ -538,7 +749,7 @@ function App(){
       </div>
 
       {showNewEntry&&<NewEntryModal member={me} onSave={saveEntry} onClose={()=>setShowNewEntry(false)}/>}
-      {showNotifs&&<NotificationsPanel entries={entries} members={members} currentMember={me} onClose={()=>setShowNotifs(false)}/>}
+      {showNotifs&&<NotificationsPanel entries={entries} members={members} currentMember={me} onClose={()=>setShowNotifs(false)} readNotifIds={readNotifIds} onMarkRead={markNotifsRead} onGoToEntry={goToEntry}/>}
     </div>
   </>;
 }
