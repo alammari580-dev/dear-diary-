@@ -354,7 +354,7 @@ const EntryCard=({entry,members,currentMember,onLike,onComment,onDelete,onLikeCo
         </div>
         <div ref={canvasRef} style={{...paperStyle(entry.paperType,entry.paperColor),margin:"0 16px 12px",padding:16}}>
           <h3 className="ds" style={{fontSize:20,color:"#d4608a",marginBottom:8}}>{entry.title}</h3>
-          {(()=>{const L=220;const long=entry.body&&entry.body.length>L;return<p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap"}}>{long?entry.body.slice(0,L):entry.body}{long&&<span onClick={e=>{e.stopPropagation();onViewFull&&onViewFull(entry);}} style={{color:"#d4608a",cursor:"pointer",fontWeight:700}}> ...more</span>}</p>;})()}
+          <p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap"}}>{entry.body&&entry.body.length>220?entry.body.slice(0,220):entry.body}{entry.body&&entry.body.length>220&&<span onClick={e=>{e.stopPropagation();onViewFull&&onViewFull(entry);}} style={{color:"#d4608a",cursor:"pointer",fontWeight:700}}> ...more</span>}</p>
           {(entry.stickers||[]).map(s=><DraggableItem key={s.id} item={s} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
           {(entry.images||[]).map(img=><DraggableItem key={img.id} item={img} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
         </div>
@@ -458,6 +458,23 @@ const ProfilePage=({member,entries,members,currentMember,onEdit,isOwn})=>{
   );
 };
 
+const DayEntriesPanel=({day,month,year,monthNames,entries,members,onGoToEntry,onClose})=>{
+  const dayEntries=entries.filter(e=>{const d=new Date(e.date);return d.getFullYear()===year&&d.getMonth()===month&&d.getDate()===day;});
+  return<GlassCard style={{padding:16,marginBottom:16}} className="fade-in">
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+      <h3 style={{fontSize:14,fontWeight:700,color:"#d4608a"}}>📅 {monthNames[month]} {day}</h3>
+      <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:"#aaa"}}><Ico name="X" size={16}/></button>
+    </div>
+    {dayEntries.map(e=>{const author=members.find(m=>m.id===e.authorId);if(!author)return null;return<div key={e.id} onClick={()=>onGoToEntry&&onGoToEntry(e.id)} style={{display:"flex",gap:10,padding:"10px 12px",borderRadius:14,background:"rgba(244,167,185,0.07)",marginBottom:8,cursor:"pointer",border:"1px solid rgba(244,167,185,0.15)"}}>
+      <Avatar member={author} size={32}/>
+      <div style={{flex:1,minWidth:0}}>
+        <p style={{fontWeight:700,fontSize:13,color:"#555",marginBottom:2}}>{e.title}</p>
+        <p style={{fontSize:12,color:"#888",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.body&&e.body.length>80?e.body.slice(0,80)+"…":e.body}</p>
+      </div>
+    </div>;})}
+  </GlassCard>;
+};
+
 const CalendarPage=({entries,members,currentMember,onGoToEntry})=>{
   const[year,setYear]=useState(new Date().getFullYear());const[month,setMonth]=useState(new Date().getMonth());
   const[selectedDay,setSelectedDay]=useState(null);
@@ -492,20 +509,7 @@ const CalendarPage=({entries,members,currentMember,onGoToEntry})=>{
           })}
         </div>
       </GlassCard>
-      {selectedDay&&(()=>{
-        const dayEntries=visible.filter(e=>{const d=new Date(e.date);return d.getFullYear()===year&&d.getMonth()===month&&d.getDate()===selectedDay;});
-        return<GlassCard style={{padding:16,marginBottom:16}} className="fade-in">
-          <h3 style={{fontSize:14,fontWeight:700,color:"#d4608a",marginBottom:12}}>📅 {monthNames[month]} {selectedDay}</h3>
-          {dayEntries.map(e=>{const author=members.find(m=>m.id===e.authorId);if(!author)return null;const long=e.body&&e.body.length>80;return<div key={e.id} onClick={()=>onGoToEntry&&onGoToEntry(e.id)} style={{display:"flex",gap:10,padding:"10px 12px",borderRadius:14,background:"rgba(244,167,185,0.07)",marginBottom:8,cursor:"pointer",border:"1px solid rgba(244,167,185,0.15)"}}>
-            <Avatar member={author} size={32}/>
-            <div style={{flex:1,minWidth:0}}>
-              <p style={{fontWeight:700,fontSize:13,color:"#555",marginBottom:2}}>{e.title}</p>
-              <p style={{fontSize:12,color:"#888",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{long?e.body.slice(0,80)+"…":e.body}</p>
-            </div>
-            <Ico name="Back" size={16} color="#F4A7B9" style={{transform:"rotate(180deg)",flexShrink:0}}/>
-          </div>;})}
-        </GlassCard>;
-      })()}
+      {selectedDay&&<DayEntriesPanel day={selectedDay} month={month} year={year} monthNames={monthNames} entries={visible} members={members} onGoToEntry={onGoToEntry} onClose={()=>setSelectedDay(null)}/>}
       {mostActive.length>0&&<GlassCard style={{padding:16}}>
         <h3 style={{fontSize:14,fontWeight:700,color:"#d4608a",marginBottom:12}}>⭐ Most Active This Month</h3>
         {mostActive.map(({member:m,count},idx)=><div key={m.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
