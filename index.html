@@ -618,6 +618,7 @@ function App(){
   const[readNotifIds,setReadNotifIds]=useState(()=>new Set(lsLoad("dd_readNotifs",[])));
   const[highlightEntryId,setHighlightEntryId]=useState(null);
   const[inputFocused,setInputFocused]=useState(false);
+  const[viewingEntry,setViewingEntry]=useState(null);
 
   // Save current member & readNotifs locally only (per-device)
   useEffect(()=>{try{localStorage.setItem("dd_currentMember",JSON.stringify(currentMember));}catch{}},[currentMember]);
@@ -744,7 +745,6 @@ function App(){
   }
 
   const navItems=[{id:"home",icon:"Home",label:"Home"},{id:"diaries",icon:"Book",label:"Diaries"},{id:"media",icon:"Img",label:"Media"},{id:"calendar",icon:"Cal",label:"Calendar"},{id:"members",icon:"Users",label:"Members"}];
-  const[viewingEntry,setViewingEntry]=useState(null);
   const eProps=(e,withNav=false)=>({key:e.id,entry:e,members,currentMember:me,onLike:likeEntry,onComment:commentEntry,onDelete:deleteEntry,onLikeComment:cid=>likeComment(e.id,cid),onReplyComment:(cid,text)=>replyToComment(e.id,cid,text),onLikeReply:(cid,rid)=>likeReply(e.id,cid,rid),highlighted:e.id===highlightEntryId,onViewFull:e=>setViewingEntry(e),...(withNav?{onCardClick:()=>setPage("diaries"),onAvatarClick:m=>setViewingProfile(m)}:{})});
 
   return<><PolkaBg/>
