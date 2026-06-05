@@ -299,7 +299,37 @@ const NewEntryModal=({member,onSave,onClose})=>{
   );
 };
 
-const EntryCard=({entry,members,currentMember,onLike,onComment,onDelete,onLikeComment,onReplyComment,onLikeReply,highlighted=false,onCardClick,onAvatarClick})=>{
+const EntryReadModal=({entry,members,onClose})=>{
+  const author=members.find(m=>m.id===entry.authorId);
+  const canvasRef=useRef();
+  if(!author)return null;
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:1100,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+      <GlassCard style={{width:"100%",maxWidth:560,maxHeight:"88vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()} className="fade-in">
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 20px",borderBottom:"1px solid rgba(244,167,185,0.2)"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <Avatar member={author} size={36}/>
+            <div>
+              <p style={{fontWeight:700,fontSize:14,color:"#555"}}>{author.name}</p>
+              <p style={{fontSize:11,color:"#bbb"}}>{new Date(entry.date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}{entry.mood&&<span style={{marginLeft:6}}>{entry.mood}</span>}</p>
+            </div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:"#aaa"}}><Ico name="X" size={20}/></button>
+        </div>
+        <div style={{overflowY:"auto",flex:1,padding:16}}>
+          <div ref={canvasRef} style={{...paperStyle(entry.paperType,entry.paperColor),padding:16,marginBottom:8,position:"relative"}}>
+            <h3 className="ds" style={{fontSize:22,color:"#d4608a",marginBottom:10}}>{entry.title}</h3>
+            <p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap"}}>{entry.body}</p>
+            {(entry.stickers||[]).map(s=><DraggableItem key={s.id} item={s} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
+            {(entry.images||[]).map(img=><DraggableItem key={img.id} item={img} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
+          </div>
+        </div>
+      </GlassCard>
+    </div>
+  );
+};
+
+const EntryCard=({entry,members,currentMember,onLike,onComment,onDelete,onLikeComment,onReplyComment,onLikeReply,highlighted=false,onCardClick,onAvatarClick,onViewFull})=>{
   const author=members.find(m=>m.id===entry.authorId);
   const[showComments,setShowComments]=useState(false);const[comment,setComment]=useState("");
   const canvasRef=useRef();
@@ -324,7 +354,7 @@ const EntryCard=({entry,members,currentMember,onLike,onComment,onDelete,onLikeCo
         </div>
         <div ref={canvasRef} style={{...paperStyle(entry.paperType,entry.paperColor),margin:"0 16px 12px",padding:16}}>
           <h3 className="ds" style={{fontSize:20,color:"#d4608a",marginBottom:8}}>{entry.title}</h3>
-          <p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap"}}>{entry.body}</p>
+          {(()=>{const L=220;const long=entry.body&&entry.body.length>L;return<p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap"}}>{long?entry.body.slice(0,L):entry.body}{long&&<span onClick={e=>{e.stopPropagation();onViewFull&&onViewFull(entry);}} style={{color:"#d4608a",cursor:"pointer",fontWeight:700}}> ...more</span>}</p>;})()}
           {(entry.stickers||[]).map(s=><DraggableItem key={s.id} item={s} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
           {(entry.images||[]).map(img=><DraggableItem key={img.id} item={img} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
         </div>
@@ -357,7 +387,6 @@ const HomeBanner=({bannerImage,onBannerChange})=>{
     <div style={{position:"relative",borderRadius:24,overflow:"hidden",marginBottom:20,height:180,background:bannerImage?"transparent":"linear-gradient(135deg,#F4A7B9,#C8A8E9,#8ECFC4)"}}>
       {bannerImage&&<img src={bannerImage} alt="banner" style={{width:"100%",height:"100%",objectFit:"cover"}}/>}
       <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,transparent 30%,rgba(0,0,0,0.3))"}}/>
-      <div style={{position:"absolute",bottom:20,left:0,right:0,textAlign:"center"}}><h1 className="ds" style={{fontSize:42,color:"#fff",textShadow:"0 2px 12px rgba(0,0,0,0.3)"}}>Dear Diary</h1></div>
       <button onClick={()=>fileRef.current.click()} style={{position:"absolute",top:12,right:12,background:"rgba(255,255,255,0.85)",border:"none",borderRadius:"50%",width:36,height:36,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Ico name="Pencil" size={15} color="#d4608a"/></button>
       <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>onBannerChange(ev.target.result);r.readAsDataURL(f);e.target.value="";}}/>
     </div>
@@ -429,8 +458,9 @@ const ProfilePage=({member,entries,members,currentMember,onEdit,isOwn})=>{
   );
 };
 
-const CalendarPage=({entries,members,currentMember})=>{
+const CalendarPage=({entries,members,currentMember,onGoToEntry})=>{
   const[year,setYear]=useState(new Date().getFullYear());const[month,setMonth]=useState(new Date().getMonth());
+  const[selectedDay,setSelectedDay]=useState(null);
   const daysInMonth=new Date(year,month+1,0).getDate();const firstDay=new Date(year,month,1).getDay();
   const monthNames=["January","February","March","April","May","June","July","August","September","October","November","December"];
   const dayNames=["Su","Mo","Tu","We","Th","Fr","Sa"];
@@ -455,13 +485,27 @@ const CalendarPage=({entries,members,currentMember})=>{
           {Array(daysInMonth).fill(null).map((_,i)=>{
             const day=i+1;const mids=dayM[day]?[...dayM[day]]:[];const has=mids.length>0;
             const isToday=new Date().getDate()===day&&new Date().getMonth()===month&&new Date().getFullYear()===year;
-            return<div key={day} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"4px 2px",borderRadius:12,background:isToday?"linear-gradient(135deg,#F4A7B9,#C8A8E9)":has?"rgba(244,167,185,0.12)":"transparent"}}>
-              <span style={{fontSize:13,fontWeight:has||isToday?700:400,color:isToday?"#fff":has?"#d4608a":"#888"}}>{day}</span>
+            return<div key={day} onClick={()=>has&&setSelectedDay(selectedDay===day?null:day)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"4px 2px",borderRadius:12,background:selectedDay===day?"linear-gradient(135deg,#F4A7B9,#C8A8E9)":isToday?"linear-gradient(135deg,#F4A7B9,#C8A8E9)":has?"rgba(244,167,185,0.12)":"transparent",cursor:has?"pointer":"default"}}>
+              <span style={{fontSize:13,fontWeight:has||isToday?700:400,color:isToday||selectedDay===day?"#fff":has?"#d4608a":"#888"}}>{day}</span>
               {has&&<div style={{display:"flex",gap:1,flexWrap:"wrap",justifyContent:"center"}}>{mids.slice(0,3).map(mid=>{const m=members.find(x=>x.id===mid);return m?<div key={mid} style={{width:14,height:14,borderRadius:"50%",background:m.color,border:"1px solid #fff",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:7,fontWeight:700,color:"#fff"}}>{m.profilePic?<img src={m.profilePic} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:m.avatar}</div>:null;})}</div>}
             </div>;
           })}
         </div>
       </GlassCard>
+      {selectedDay&&(()=>{
+        const dayEntries=visible.filter(e=>{const d=new Date(e.date);return d.getFullYear()===year&&d.getMonth()===month&&d.getDate()===selectedDay;});
+        return<GlassCard style={{padding:16,marginBottom:16}} className="fade-in">
+          <h3 style={{fontSize:14,fontWeight:700,color:"#d4608a",marginBottom:12}}>📅 {monthNames[month]} {selectedDay}</h3>
+          {dayEntries.map(e=>{const author=members.find(m=>m.id===e.authorId);if(!author)return null;const long=e.body&&e.body.length>80;return<div key={e.id} onClick={()=>onGoToEntry&&onGoToEntry(e.id)} style={{display:"flex",gap:10,padding:"10px 12px",borderRadius:14,background:"rgba(244,167,185,0.07)",marginBottom:8,cursor:"pointer",border:"1px solid rgba(244,167,185,0.15)"}}>
+            <Avatar member={author} size={32}/>
+            <div style={{flex:1,minWidth:0}}>
+              <p style={{fontWeight:700,fontSize:13,color:"#555",marginBottom:2}}>{e.title}</p>
+              <p style={{fontSize:12,color:"#888",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{long?e.body.slice(0,80)+"…":e.body}</p>
+            </div>
+            <Ico name="Back" size={16} color="#F4A7B9" style={{transform:"rotate(180deg)",flexShrink:0}}/>
+          </div>;})}
+        </GlassCard>;
+      })()}
       {mostActive.length>0&&<GlassCard style={{padding:16}}>
         <h3 style={{fontSize:14,fontWeight:700,color:"#d4608a",marginBottom:12}}>⭐ Most Active This Month</h3>
         {mostActive.map(({member:m,count},idx)=><div key={m.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
@@ -696,7 +740,8 @@ function App(){
   }
 
   const navItems=[{id:"home",icon:"Home",label:"Home"},{id:"diaries",icon:"Book",label:"Diaries"},{id:"media",icon:"Img",label:"Media"},{id:"calendar",icon:"Cal",label:"Calendar"},{id:"members",icon:"Users",label:"Members"}];
-  const eProps=(e,withNav=false)=>({key:e.id,entry:e,members,currentMember:me,onLike:likeEntry,onComment:commentEntry,onDelete:deleteEntry,onLikeComment:cid=>likeComment(e.id,cid),onReplyComment:(cid,text)=>replyToComment(e.id,cid,text),onLikeReply:(cid,rid)=>likeReply(e.id,cid,rid),highlighted:e.id===highlightEntryId,...(withNav?{onCardClick:()=>setPage("diaries"),onAvatarClick:m=>setViewingProfile(m)}:{})});
+  const[viewingEntry,setViewingEntry]=useState(null);
+  const eProps=(e,withNav=false)=>({key:e.id,entry:e,members,currentMember:me,onLike:likeEntry,onComment:commentEntry,onDelete:deleteEntry,onLikeComment:cid=>likeComment(e.id,cid),onReplyComment:(cid,text)=>replyToComment(e.id,cid,text),onLikeReply:(cid,rid)=>likeReply(e.id,cid,rid),highlighted:e.id===highlightEntryId,onViewFull:e=>setViewingEntry(e),...(withNav?{onCardClick:()=>setPage("diaries"),onAvatarClick:m=>setViewingProfile(m)}:{})});
 
   return<><PolkaBg/>
     <div style={{maxWidth:480,margin:"0 auto",minHeight:"100vh",position:"relative"}}>
@@ -729,7 +774,7 @@ function App(){
           {visible.filter(e=>!e.isDraft).length===0?<GlassCard style={{padding:40,textAlign:"center"}}><p className="ds" style={{fontSize:24,color:"#d4608a",marginBottom:8}}>No entries yet</p><p style={{color:"#bbb",fontSize:14}}>Be the first to write something ✨</p></GlassCard>:visible.filter(e=>!e.isDraft).map(e=><EntryCard {...eProps(e)}/>)}
         </div>}
         {page==="media"&&<MediaPage entries={entries} members={members} currentMember={me} onGoToEntry={id=>{goToEntry(id);setPage("diaries");}}/>}
-        {page==="calendar"&&<CalendarPage entries={entries} members={members} currentMember={me}/>}
+        {page==="calendar"&&<CalendarPage entries={entries} members={members} currentMember={me} onGoToEntry={id=>{goToEntry(id);setPage("diaries");}}/>}
         {page==="members"&&<MembersPage members={members} entries={entries} onViewProfile={m=>setViewingProfile(m)}/>}
       </div>
       {!inputFocused&&<button onClick={()=>setShowNewEntry(true)} style={{position:"fixed",bottom:92,right:"max(16px, calc(50% - 224px))",width:56,height:56,borderRadius:"50%",background:"linear-gradient(135deg,#F4A7B9,#C8A8E9)",border:"none",cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 20px rgba(244,167,185,0.5)",zIndex:90}}>
@@ -742,6 +787,7 @@ function App(){
       </div>
       {showNewEntry&&<NewEntryModal member={me} onSave={saveEntry} onClose={()=>setShowNewEntry(false)}/>}
       {showNotifs&&<NotificationsPanel entries={entries} members={members} currentMember={me} onClose={()=>setShowNotifs(false)} readNotifIds={readNotifIds} onMarkRead={markNotifsRead} onGoToEntry={goToEntry}/>}
+      {viewingEntry&&<EntryReadModal entry={viewingEntry} members={members} onClose={()=>setViewingEntry(null)}/>}
     </div>
   </>;
 }
