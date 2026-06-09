@@ -353,10 +353,10 @@ const EntryReadModal=({entry,members,onClose})=>{
         </div>
         <div style={{overflowY:"auto",flex:1,padding:16}}>
           <div ref={canvasRef} style={{...paperStyle(entry.paperType,entry.paperColor),padding:16,marginBottom:8,position:"relative"}}>
-            <h3 className="ds" style={{fontSize:22,color:"#d4608a",marginBottom:10}}>{entry.title}</h3>
-            <p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap"}}>{entry.body}</p>
             {(entry.stickers||[]).map(s=><DraggableItem key={s.id} item={s} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
             {(entry.images||[]).map(img=><DraggableItem key={img.id} item={img} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
+            <h3 className="ds" style={{fontSize:22,color:"#d4608a",marginBottom:10,position:"relative",zIndex:20}}>{entry.title}</h3>
+            <p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap",position:"relative",zIndex:20}}>{entry.body}</p>
           </div>
         </div>
       </GlassCard>
@@ -738,9 +738,11 @@ function App(){
       setLoading(false);
     },()=>setLoading(false));
 
-    const unsubEntries=db.collection("diary-entries").orderBy("date","desc").onSnapshot(snap=>{
-      setEntries(snap.docs.map(d=>d.data()));
-    });
+    const unsubEntries=db.collection("diary-entries").onSnapshot(snap=>{
+      const docs=snap.docs.map(d=>d.data());
+      docs.sort((a,b)=>new Date(b.date)-new Date(a.date));
+      setEntries(docs);
+    },err=>console.error("entries snapshot error:",err));
 
     return()=>{unsubConfig();unsubEntries();};
   },[]);
