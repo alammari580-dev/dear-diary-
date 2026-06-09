@@ -293,9 +293,11 @@ const NewEntryModal=({member,onSave,onClose,editEntry=null})=>{
           {tab==="write"&&<div style={{padding:16}}>
             <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Title your entry..." style={{width:"100%",border:"none",background:"transparent",fontSize:20,fontFamily:"'Dancing Script',cursive",color:"#d4608a",outline:"none",marginBottom:8}}/>
             <div ref={canvasRef} style={{...paperStyle(paperType,paperColor),minHeight:300,marginBottom:12}}>
-              <textarea value={body} onChange={e=>setBody(e.target.value)} placeholder="Dear Diary..." style={{width:"100%",background:"transparent",border:"none",outline:"none",resize:"none",minHeight:240,fontSize:15,lineHeight:"28px",color:"#555"}}/>
-              {stickers.map(s=><DraggableItem key={s.id} item={s} containerRef={canvasRef} onMove={(id,x,y)=>setStickers(p=>p.map(s=>s.id===id?{...s,x,y}:s))} onRemove={id=>setStickers(p=>p.filter(s=>s.id!==id))} isOwner={true}/>)}
-              {images.map(img=><DraggableItem key={img.id} item={img} containerRef={canvasRef} onMove={(id,x,y)=>setImages(p=>p.map(i=>i.id===id?{...i,x,y}:i))} onRemove={id=>setImages(p=>p.filter(i=>i.id!==id))} isOwner={true}/>)}
+              <textarea value={body} onChange={e=>setBody(e.target.value)} placeholder="Dear Diary..." style={{width:"100%",background:"transparent",border:"none",outline:"none",resize:"none",minHeight:240,fontSize:15,lineHeight:"28px",color:"#555",position:"relative",zIndex:1}}/>
+              <div style={{position:"absolute",inset:0,zIndex:20,pointerEvents:"none"}}>
+                {stickers.map(s=><div key={s.id} style={{pointerEvents:"all"}}><DraggableItem item={s} containerRef={canvasRef} onMove={(id,x,y)=>setStickers(p=>p.map(s=>s.id===id?{...s,x,y}:s))} onRemove={id=>setStickers(p=>p.filter(s=>s.id!==id))} isOwner={true}/></div>)}
+                {images.map(img=><div key={img.id} style={{pointerEvents:"all"}}><DraggableItem item={img} containerRef={canvasRef} onMove={(id,x,y)=>setImages(p=>p.map(i=>i.id===id?{...i,x,y}:i))} onRemove={id=>setImages(p=>p.filter(i=>i.id!==id))} isOwner={true}/></div>)}
+              </div>
             </div>
             <p style={{fontSize:12,color:"#aaa",marginBottom:6}}>Mood</p>
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
