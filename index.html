@@ -632,7 +632,7 @@ const CalendarPage=({entries,members,currentMember,onGoToEntry})=>{
 };
 
 const MediaPage=({entries,members,currentMember,onGoToEntry})=>{
-  const allMedia=entries.filter(e=>e.privacy==="friends"||e.authorId===currentMember.id).flatMap(e=>(e.images||[]).map(img=>({...img,authorId:e.authorId,entryId:e.id})));
+  const allMedia=entries.filter(e=>!e.isDraft&&(e.privacy==="friends"||e.authorId===currentMember.id)).flatMap(e=>(e.images||[]).map(img=>({...img,authorId:e.authorId,entryId:e.id})));
   return<div style={{padding:16,paddingBottom:80}}>
     <h2 className="ds" style={{fontSize:28,color:"#d4608a",marginBottom:16}}>Media</h2>
     {allMedia.length===0?<p style={{textAlign:"center",color:"#ccc",padding:32}}>No photos yet 📸</p>:
