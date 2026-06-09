@@ -127,6 +127,17 @@ const calcStreak=(entries,memberId)=>{
   return{current,best};
 };
 
+const compressSticker=(dataUrl)=>new Promise(resolve=>{
+  const img=new window.Image();
+  img.onload=()=>{
+    const MAX=180,W=Math.min(img.width,MAX),H=Math.round(img.height*W/img.width);
+    const canvas=document.createElement("canvas");canvas.width=W;canvas.height=H;
+    canvas.getContext("2d").drawImage(img,0,0,W,H);
+    resolve(canvas.toDataURL("image/png"));
+  };
+  img.src=dataUrl;
+});
+
 const compressImage=(dataUrl,maxW=500,quality=0.6)=>new Promise(resolve=>{
   const img=new window.Image();
   img.onload=()=>{
@@ -305,7 +316,7 @@ const NewEntryModal=({member,onSave,onClose,editEntry=null})=>{
               {["private","friends"].map(p=><button key={p} onClick={()=>setPrivacy(p)} style={{padding:"6px 14px",borderRadius:999,background:privacy===p?"#C8A8E9":"rgba(200,168,233,0.15)",border:"none",cursor:"pointer",fontWeight:600,fontSize:13,color:privacy===p?"#fff":"#8a60c0"}}>{p==="private"?"🔒 Private":"👯 Friends"}</button>)}
             </div>
           </div>}
-          {tab==="stickers"&&<StickerCreator onAdd={s=>{setStickers(p=>[...p,s]);setTab("write");}}/>}
+          {tab==="stickers"&&<StickerCreator onAdd={async s=>{const c=await compressSticker(s.content);setStickers(p=>[...p,{...s,content:c}]);setTab("write");}}/>}
           {tab==="images"&&<div style={{padding:16}}>
             <p style={{fontSize:13,color:"#888",marginBottom:12}}>Upload images to add to your diary entry.</p>
             <FileUploadBtn onFile={async d=>{const c=await compressImage(d);setImages(p=>[...p,{id:Date.now(),url:c,x:10,y:10,w:150}]);setTab("write");}} label="Add Image" color="#8ECFC4"/>
