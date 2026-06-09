@@ -831,7 +831,7 @@ function App(){
   };
 
   const markNotifsRead=ids=>setReadNotifIds(prev=>new Set([...prev,...ids]));
-  const goToEntry=entryId=>{setShowNotifs(false);setPage("home");setHighlightEntryId(entryId);};
+  const goToEntry=entryId=>{setShowNotifs(false);setPage("diaries");setHighlightEntryId(entryId);};
 
   const notifCount=me?(()=>{
     const allIds=entries.filter(e=>e.authorId===me.id).flatMap(e=>[...e.likes.filter(l=>l!==me.id).map(l=>`l${e.id}${l}`),...e.comments.filter(c=>c.authorId!==me.id).map(c=>`c${c.id}`)]);
