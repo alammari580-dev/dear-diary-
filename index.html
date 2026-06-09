@@ -767,9 +767,10 @@ function App(){
 
   // All writes go to Firebase
   const saveEntry=entry=>{
-    setEntries(prev=>{const without=prev.filter(e=>String(e.id)!==String(entry.id));return[entry,...without].sort((a,b)=>new Date(b.date)-new Date(a.date));});
-    db.collection("diary-entries").doc(String(entry.id)).set(entry)
-      .catch(err=>{alert("خطأ في الحفظ: "+err.message);setEntries(prev=>prev.filter(e=>String(e.id)!==String(entry.id)));});
+    const clean=JSON.parse(JSON.stringify(entry));
+    setEntries(prev=>{const without=prev.filter(e=>String(e.id)!==String(clean.id));return[clean,...without].sort((a,b)=>new Date(b.date)-new Date(a.date));});
+    db.collection("diary-entries").doc(String(clean.id)).set(clean)
+      .catch(err=>{alert("خطأ في الحفظ: "+err.message);setEntries(prev=>prev.filter(e=>String(e.id)!==String(clean.id)));});
     setShowNewEntry(false);
   };
   const deleteEntry=id=>db.collection("diary-entries").doc(String(id)).delete();
