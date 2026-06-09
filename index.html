@@ -292,8 +292,8 @@ const NewEntryModal=({member,onSave,onClose,editEntry=null})=>{
         <div style={{flex:1,overflowY:"auto"}}>
           {tab==="write"&&<div style={{padding:16}}>
             <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Title your entry..." style={{width:"100%",border:"none",background:"transparent",fontSize:20,fontFamily:"'Dancing Script',cursive",color:"#d4608a",outline:"none",marginBottom:8}}/>
-            <div ref={canvasRef} style={{...paperStyle(paperType,paperColor),height:340,marginBottom:12,overflow:"hidden"}}>
-              <textarea value={body} onChange={e=>setBody(e.target.value)} placeholder="Dear Diary..." style={{width:"100%",background:"transparent",border:"none",outline:"none",resize:"none",height:280,fontSize:15,lineHeight:"28px",color:"#555",position:"relative",zIndex:1,overflowY:"auto"}}/>
+            <div ref={canvasRef} style={{...paperStyle(paperType,paperColor),minHeight:300,marginBottom:12}}>
+              <textarea value={body} onChange={e=>setBody(e.target.value)} placeholder="Dear Diary..." style={{width:"100%",background:"transparent",border:"none",outline:"none",resize:"none",minHeight:240,fontSize:15,lineHeight:"28px",color:"#555",position:"relative",zIndex:1}}/>
               <div style={{position:"absolute",inset:0,zIndex:20,pointerEvents:"none"}}>
                 {stickers.map(s=><div key={s.id} style={{pointerEvents:"all"}}><DraggableItem item={s} containerRef={canvasRef} onMove={(id,x,y)=>setStickers(p=>p.map(s=>s.id===id?{...s,x,y}:s))} onRemove={id=>setStickers(p=>p.filter(s=>s.id!==id))} isOwner={true}/></div>)}
                 {images.map(img=><div key={img.id} style={{pointerEvents:"all"}}><DraggableItem item={img} containerRef={canvasRef} onMove={(id,x,y)=>setImages(p=>p.map(i=>i.id===id?{...i,x,y}:i))} onRemove={id=>setImages(p=>p.filter(i=>i.id!==id))} isOwner={true}/></div>)}
@@ -365,7 +365,7 @@ const EntryReadModal=({entry,members,onClose})=>{
           <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:"#aaa"}}><Ico name="X" size={20}/></button>
         </div>
         <div style={{overflowY:"auto",flex:1,padding:16}}>
-          <div ref={canvasRef} style={{...paperStyle(entry.paperType,entry.paperColor),padding:16,marginBottom:8,position:"relative",height:340,overflow:"hidden"}}>
+          <div ref={canvasRef} style={{...paperStyle(entry.paperType,entry.paperColor),padding:16,marginBottom:8,position:"relative"}}>
             {(entry.stickers||[]).map(s=><DraggableItem key={s.id} item={s} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
             {(entry.images||[]).map(img=><DraggableItem key={img.id} item={img} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
             <h3 className="ds" style={{fontSize:22,color:"#d4608a",marginBottom:10,position:"relative",zIndex:20}}>{entry.title}</h3>
@@ -401,14 +401,11 @@ const EntryCard=({entry,members,currentMember,onLike,onComment,onDelete,onLikeCo
             {isOwner&&<button onClick={()=>onDelete(entry.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#ffaaaa",opacity:0.7}}><Ico name="Trash" size={14}/></button>}
           </div>
         </div>
-        <div style={{margin:"0 16px 12px",position:"relative"}}>
-          <div ref={canvasRef} style={{...paperStyle(entry.paperType,entry.paperColor),padding:16,height:340,overflow:"hidden"}}>
-            {(entry.stickers||[]).map(s=><DraggableItem key={s.id} item={s} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
-            {(entry.images||[]).map(img=><DraggableItem key={img.id} item={img} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
-            <h3 className="ds" style={{fontSize:20,color:"#d4608a",marginBottom:8,position:"relative",zIndex:20}}>{entry.title}</h3>
-            <p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap",position:"relative",zIndex:20}}>{entry.body}</p>
-          </div>
-          {entry.body&&entry.body.length>220&&<div style={{textAlign:"right",marginTop:4}}><span onClick={e=>{e.stopPropagation();onViewFull&&onViewFull(entry);}} style={{color:"#d4608a",cursor:"pointer",fontWeight:700,fontSize:13}}>...more</span></div>}
+        <div ref={canvasRef} style={{...paperStyle(entry.paperType,entry.paperColor),margin:"0 16px 12px",padding:16}}>
+          {(entry.stickers||[]).map(s=><DraggableItem key={s.id} item={s} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
+          {(entry.images||[]).map(img=><DraggableItem key={img.id} item={img} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
+          <h3 className="ds" style={{fontSize:20,color:"#d4608a",marginBottom:8,position:"relative",zIndex:20}}>{entry.title}</h3>
+          <p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap",position:"relative",zIndex:20}}>{entry.body&&entry.body.length>220?entry.body.slice(0,220):entry.body}{entry.body&&entry.body.length>220&&<span onClick={e=>{e.stopPropagation();onViewFull&&onViewFull(entry);}} style={{color:"#d4608a",cursor:"pointer",fontWeight:700}}> ...more</span>}</p>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:16,padding:"8px 20px 12px"}} onClick={e=>e.stopPropagation()}>
           <button onClick={()=>onLike(entry.id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,color:liked?"#e05c8a":"#aaa",fontWeight:600,fontSize:13}}>
