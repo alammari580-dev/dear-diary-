@@ -391,8 +391,8 @@ const EntryCard=({entry,members,currentMember,onLike,onComment,onDelete,onLikeCo
         <div ref={canvasRef} style={{...paperStyle(entry.paperType,entry.paperColor),margin:"0 16px 12px",padding:16}}>
           {(entry.stickers||[]).map(s=><DraggableItem key={s.id} item={s} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
           {(entry.images||[]).map(img=><DraggableItem key={img.id} item={img} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
-          <h3 className="ds" style={{fontSize:20,color:"#d4608a",marginBottom:8,position:"relative",zIndex:1}}>{entry.title}</h3>
-          <p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap",position:"relative",zIndex:1}}>{entry.body&&entry.body.length>220?entry.body.slice(0,220):entry.body}{entry.body&&entry.body.length>220&&<span onClick={e=>{e.stopPropagation();onViewFull&&onViewFull(entry);}} style={{color:"#d4608a",cursor:"pointer",fontWeight:700}}> ...more</span>}</p>
+          <h3 className="ds" style={{fontSize:20,color:"#d4608a",marginBottom:8,position:"relative",zIndex:20}}>{entry.title}</h3>
+          <p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap",position:"relative",zIndex:20}}>{entry.body&&entry.body.length>220?entry.body.slice(0,220):entry.body}{entry.body&&entry.body.length>220&&<span onClick={e=>{e.stopPropagation();onViewFull&&onViewFull(entry);}} style={{color:"#d4608a",cursor:"pointer",fontWeight:700}}> ...more</span>}</p>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:16,padding:"8px 20px 12px"}} onClick={e=>e.stopPropagation()}>
           <button onClick={()=>onLike(entry.id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,color:liked?"#e05c8a":"#aaa",fontWeight:600,fontSize:13}}>
