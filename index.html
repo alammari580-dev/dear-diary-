@@ -257,7 +257,7 @@ const NewEntryModal=({member,onSave,onClose,editEntry=null})=>{
   const save=(draft=false)=>{
     if(!title.trim()&&!body.trim())return;
     onSave({
-      id:editEntry?editEntry.id:Date.now(),
+      id:editEntry?editEntry.id:Date.now()+""+Math.floor(Math.random()*10000),
       authorId:member.id,
       title:title||"Untitled",
       body,mood,paperType,paperColor,privacy,stickers,images,
@@ -767,7 +767,9 @@ function App(){
 
   // All writes go to Firebase
   const saveEntry=entry=>{
-    db.collection("diary-entries").doc(String(entry.id)).set(entry);
+    setEntries(prev=>{const without=prev.filter(e=>String(e.id)!==String(entry.id));return[entry,...without].sort((a,b)=>new Date(b.date)-new Date(a.date));});
+    db.collection("diary-entries").doc(String(entry.id)).set(entry)
+      .catch(err=>{alert("خطأ في الحفظ: "+err.message);setEntries(prev=>prev.filter(e=>String(e.id)!==String(entry.id)));});
     setShowNewEntry(false);
   };
   const deleteEntry=id=>db.collection("diary-entries").doc(String(id)).delete();
