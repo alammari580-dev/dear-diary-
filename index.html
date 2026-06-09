@@ -401,11 +401,14 @@ const EntryCard=({entry,members,currentMember,onLike,onComment,onDelete,onLikeCo
             {isOwner&&<button onClick={()=>onDelete(entry.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#ffaaaa",opacity:0.7}}><Ico name="Trash" size={14}/></button>}
           </div>
         </div>
-        <div ref={canvasRef} style={{...paperStyle(entry.paperType,entry.paperColor),margin:"0 16px 12px",padding:16}}>
-          {(entry.stickers||[]).map(s=><DraggableItem key={s.id} item={s} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
-          {(entry.images||[]).map(img=><DraggableItem key={img.id} item={img} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
-          <h3 className="ds" style={{fontSize:20,color:"#d4608a",marginBottom:8,position:"relative",zIndex:20}}>{entry.title}</h3>
-          <p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap",position:"relative",zIndex:20}}>{entry.body&&entry.body.length>220?entry.body.slice(0,220):entry.body}{entry.body&&entry.body.length>220&&<span onClick={e=>{e.stopPropagation();onViewFull&&onViewFull(entry);}} style={{color:"#d4608a",cursor:"pointer",fontWeight:700}}> ...more</span>}</p>
+        <div style={{margin:"0 16px 12px",position:"relative"}}>
+          <div ref={canvasRef} style={{...paperStyle(entry.paperType,entry.paperColor),padding:16,maxHeight:320,overflow:"hidden"}}>
+            {(entry.stickers||[]).map(s=><DraggableItem key={s.id} item={s} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
+            {(entry.images||[]).map(img=><DraggableItem key={img.id} item={img} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
+            <h3 className="ds" style={{fontSize:20,color:"#d4608a",marginBottom:8,position:"relative",zIndex:20}}>{entry.title}</h3>
+            <p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap",position:"relative",zIndex:20}}>{entry.body}</p>
+          </div>
+          {entry.body&&entry.body.length>220&&<div style={{textAlign:"right",marginTop:4}}><span onClick={e=>{e.stopPropagation();onViewFull&&onViewFull(entry);}} style={{color:"#d4608a",cursor:"pointer",fontWeight:700,fontSize:13}}>...more</span></div>}
         </div>
         <div style={{display:"flex",alignItems:"center",gap:16,padding:"8px 20px 12px"}} onClick={e=>e.stopPropagation()}>
           <button onClick={()=>onLike(entry.id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,color:liked?"#e05c8a":"#aaa",fontWeight:600,fontSize:13}}>
