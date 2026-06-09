@@ -251,8 +251,8 @@ const NewEntryModal=({member,onSave,onClose,editEntry=null})=>{
   const[paperType,setPaperType]=useState(editEntry?editEntry.paperType:"lined");
   const[paperColor,setPaperColor]=useState(editEntry?editEntry.paperColor:PAPER_COLORS[0]);
   const[privacy,setPrivacy]=useState(editEntry?editEntry.privacy:"friends");
-  const[stickers,setStickers]=useState(editEntry?editEntry.stickers||[]);
-  const[images,setImages]=useState(editEntry?editEntry.images||[]);
+  const[stickers,setStickers]=useState(editEntry?editEntry.stickers||[]:[]);
+  const[images,setImages]=useState(editEntry?editEntry.images||[]:[]);
   const canvasRef=useRef();
   const save=(draft=false)=>{
     if(!title.trim()&&!body.trim())return;
