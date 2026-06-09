@@ -243,17 +243,36 @@ const StickerCreator=({onAdd})=>{
   );
 };
 
-const NewEntryModal=({member,onSave,onClose})=>{
-  const[tab,setTab]=useState("write");const[title,setTitle]=useState("");const[body,setBody]=useState("");const[mood,setMood]=useState("");
-  const[paperType,setPaperType]=useState("lined");const[paperColor,setPaperColor]=useState(PAPER_COLORS[0]);const[privacy,setPrivacy]=useState("friends");
-  const[stickers,setStickers]=useState([]);const[images,setImages]=useState([]);const canvasRef=useRef();
-  const save=(draft=false)=>{if(!title.trim()&&!body.trim())return;onSave({id:Date.now(),authorId:member.id,title:title||"Untitled",body,mood,paperType,paperColor,privacy,stickers,images,isDraft:draft,likes:[],comments:[],date:new Date().toISOString()});};
+const NewEntryModal=({member,onSave,onClose,editEntry=null})=>{
+  const[tab,setTab]=useState("write");
+  const[title,setTitle]=useState(editEntry?editEntry.title:"");
+  const[body,setBody]=useState(editEntry?editEntry.body:"");
+  const[mood,setMood]=useState(editEntry?editEntry.mood:"");
+  const[paperType,setPaperType]=useState(editEntry?editEntry.paperType:"lined");
+  const[paperColor,setPaperColor]=useState(editEntry?editEntry.paperColor:PAPER_COLORS[0]);
+  const[privacy,setPrivacy]=useState(editEntry?editEntry.privacy:"friends");
+  const[stickers,setStickers]=useState(editEntry?editEntry.stickers||[]);
+  const[images,setImages]=useState(editEntry?editEntry.images||[]);
+  const canvasRef=useRef();
+  const save=(draft=false)=>{
+    if(!title.trim()&&!body.trim())return;
+    onSave({
+      id:editEntry?editEntry.id:Date.now(),
+      authorId:member.id,
+      title:title||"Untitled",
+      body,mood,paperType,paperColor,privacy,stickers,images,
+      isDraft:draft,
+      likes:editEntry?editEntry.likes:[],
+      comments:editEntry?editEntry.comments:[],
+      date:editEntry?editEntry.date:new Date().toISOString()
+    });
+  };
   const tabs=[{id:"write",label:"Write",icon:"Type"},{id:"style",label:"Style",icon:"Palette"},{id:"stickers",label:"Stickers",icon:"Star"},{id:"images",label:"Images",icon:"Img"}];
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:16}}>
       <GlassCard style={{width:"100%",maxWidth:520,maxHeight:"90vh",display:"flex",flexDirection:"column"}} className="fade-in">
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 20px",borderBottom:"1px solid rgba(244,167,185,0.2)"}}>
-          <h2 className="ds" style={{fontSize:22,color:"#d4608a"}}>New Entry</h2>
+          <h2 className="ds" style={{fontSize:22,color:"#d4608a"}}>{editEntry?"Edit Entry":"New Entry"}</h2>
           <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:"#aaa"}}><Ico name="X" size={20}/></button>
         </div>
         <div style={{display:"flex",gap:4,padding:"8px 16px",borderBottom:"1px solid rgba(244,167,185,0.15)"}}>
@@ -345,7 +364,7 @@ const EntryReadModal=({entry,members,onClose})=>{
   );
 };
 
-const EntryCard=({entry,members,currentMember,onLike,onComment,onDelete,onLikeComment,onReplyComment,onLikeReply,highlighted=false,onCardClick,onAvatarClick,onViewFull})=>{
+const EntryCard=({entry,members,currentMember,onLike,onComment,onDelete,onLikeComment,onReplyComment,onLikeReply,highlighted=false,onCardClick,onAvatarClick,onViewFull,onEditDraft})=>{
   const author=members.find(m=>m.id===entry.authorId);
   const[showComments,setShowComments]=useState(false);const[comment,setComment]=useState("");
   const canvasRef=useRef();
@@ -363,16 +382,17 @@ const EntryCard=({entry,members,currentMember,onLike,onComment,onDelete,onLikeCo
               <p style={{fontSize:11,color:"#bbb"}}>{new Date(entry.date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}{entry.mood&&<span style={{marginLeft:6}}>{entry.mood}</span>}{entry.isDraft&&<span style={{marginLeft:6,background:"#ffe0e6",color:"#d4608a",padding:"1px 6px",borderRadius:8,fontSize:10}}>Draft</span>}</p>
             </div>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}} onClick={e=>e.stopPropagation()}>
             <span style={{fontSize:11,color:"#ccc"}}>{entry.privacy==="private"?"🔒":"👯"}</span>
+            {isOwner&&entry.isDraft&&onEditDraft&&<button onClick={()=>onEditDraft(entry)} style={{background:"none",border:"none",cursor:"pointer",color:"#C8A8E9",opacity:0.9}}><Ico name="Pencil" size={14}/></button>}
             {isOwner&&<button onClick={()=>onDelete(entry.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#ffaaaa",opacity:0.7}}><Ico name="Trash" size={14}/></button>}
           </div>
         </div>
         <div ref={canvasRef} style={{...paperStyle(entry.paperType,entry.paperColor),margin:"0 16px 12px",padding:16}}>
-          <h3 className="ds" style={{fontSize:20,color:"#d4608a",marginBottom:8}}>{entry.title}</h3>
-          <p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap"}}>{entry.body&&entry.body.length>220?entry.body.slice(0,220):entry.body}{entry.body&&entry.body.length>220&&<span onClick={e=>{e.stopPropagation();onViewFull&&onViewFull(entry);}} style={{color:"#d4608a",cursor:"pointer",fontWeight:700}}> ...more</span>}</p>
           {(entry.stickers||[]).map(s=><DraggableItem key={s.id} item={s} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
           {(entry.images||[]).map(img=><DraggableItem key={img.id} item={img} containerRef={canvasRef} onMove={()=>{}} onRemove={()=>{}} isOwner={false}/>)}
+          <h3 className="ds" style={{fontSize:20,color:"#d4608a",marginBottom:8,position:"relative",zIndex:1}}>{entry.title}</h3>
+          <p style={{fontSize:14,color:"#666",lineHeight:1.8,whiteSpace:"pre-wrap",position:"relative",zIndex:1}}>{entry.body&&entry.body.length>220?entry.body.slice(0,220):entry.body}{entry.body&&entry.body.length>220&&<span onClick={e=>{e.stopPropagation();onViewFull&&onViewFull(entry);}} style={{color:"#d4608a",cursor:"pointer",fontWeight:700}}> ...more</span>}</p>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:16,padding:"8px 20px 12px"}} onClick={e=>e.stopPropagation()}>
           <button onClick={()=>onLike(entry.id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,color:liked?"#e05c8a":"#aaa",fontWeight:600,fontSize:13}}>
@@ -404,7 +424,7 @@ const HomeBanner=({bannerImage,onBannerChange})=>{
       {bannerImage&&<img src={bannerImage} alt="banner" style={{width:"100%",height:"100%",objectFit:"cover"}}/>}
       <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,transparent 30%,rgba(0,0,0,0.3))"}}/>
       <button onClick={()=>fileRef.current.click()} style={{position:"absolute",top:12,right:12,background:"rgba(255,255,255,0.85)",border:"none",borderRadius:"50%",width:36,height:36,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Ico name="Pencil" size={15} color="#d4608a"/></button>
-      <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>onBannerChange(ev.target.result);r.readAsDataURL(f);e.target.value="";}}/>
+      <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async ev=>{const c=await compressImage(ev.target.result,900,0.7);onBannerChange(c);};r.readAsDataURL(f);e.target.value="";}}/>
     </div>
   );
 };
@@ -422,7 +442,7 @@ const SettingsPage=({member,onUpdate,onBack})=>{
         <h3 style={{fontSize:15,fontWeight:700,color:"#888",marginBottom:16}}>Profile Picture</h3>
         <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:12}}>
           <Avatar member={{...member,profilePic,name,avatar:member.avatar}} size={64}/>
-          <FileUploadBtn onFile={setProfilePic} label="Upload Photo" color="#F4A7B9"/>
+          <FileUploadBtn onFile={async d=>{const c=await compressImage(d,400,0.7);setProfilePic(c);}} label="Upload Photo" color="#F4A7B9"/>
           {profilePic&&<PillBtn onClick={()=>setProfilePic(null)} color="#ffaaaa" style={{fontSize:12}}>Remove</PillBtn>}
         </div>
       </GlassCard>
@@ -430,7 +450,7 @@ const SettingsPage=({member,onUpdate,onBack})=>{
         <h3 style={{fontSize:15,fontWeight:700,color:"#888",marginBottom:16}}>Profile Banner</h3>
         {profileBanner&&<img src={profileBanner} alt="banner" style={{width:"100%",height:100,objectFit:"cover",borderRadius:12,marginBottom:10}}/>}
         <div style={{display:"flex",gap:8}}>
-          <FileUploadBtn onFile={setProfileBanner} label="Upload Banner" color="#C8A8E9"/>
+          <FileUploadBtn onFile={async d=>{const c=await compressImage(d,900,0.7);setProfileBanner(c);}} label="Upload Banner" color="#C8A8E9"/>
           {profileBanner&&<PillBtn onClick={()=>setProfileBanner(null)} color="#ffaaaa" style={{fontSize:12}}>Remove</PillBtn>}
         </div>
       </GlassCard>
@@ -698,6 +718,7 @@ function App(){
   const[highlightEntryId,setHighlightEntryId]=useState(null);
   const[inputFocused,setInputFocused]=useState(false);
   const[viewingEntry,setViewingEntry]=useState(null);
+  const[editingDraft,setEditingDraft]=useState(null);
 
   // Save current member & readNotifs locally only (per-device)
   useEffect(()=>{try{localStorage.setItem("dd_currentMember",JSON.stringify(currentMember));}catch{}},[currentMember]);
@@ -824,7 +845,7 @@ function App(){
   }
 
   const navItems=[{id:"home",icon:"Home",label:"Home"},{id:"diaries",icon:"Book",label:"Diaries"},{id:"media",icon:"Img",label:"Media"},{id:"calendar",icon:"Cal",label:"Calendar"},{id:"members",icon:"Users",label:"Members"}];
-  const eProps=(e,withNav=false)=>({key:e.id,entry:e,members,currentMember:me,onLike:likeEntry,onComment:commentEntry,onDelete:deleteEntry,onLikeComment:cid=>likeComment(e.id,cid),onReplyComment:(cid,text)=>replyToComment(e.id,cid,text),onLikeReply:(cid,rid)=>likeReply(e.id,cid,rid),highlighted:e.id===highlightEntryId,onViewFull:e=>setViewingEntry(e),...(withNav?{onCardClick:()=>setPage("diaries"),onAvatarClick:m=>setViewingProfile(m)}:{})});
+  const eProps=(e,withNav=false)=>({key:e.id,entry:e,members,currentMember:me,onLike:likeEntry,onComment:commentEntry,onDelete:deleteEntry,onLikeComment:cid=>likeComment(e.id,cid),onReplyComment:(cid,text)=>replyToComment(e.id,cid,text),onLikeReply:(cid,rid)=>likeReply(e.id,cid,rid),highlighted:e.id===highlightEntryId,onViewFull:ent=>setViewingEntry(ent),onEditDraft:ent=>setEditingDraft(ent),...(withNav?{onCardClick:()=>setPage("diaries"),onAvatarClick:m=>setViewingProfile(m)}:{})});
 
   return<><PolkaBg/>
     <div style={{maxWidth:480,margin:"0 auto",minHeight:"100vh",position:"relative"}}>
@@ -868,6 +889,7 @@ function App(){
         </button>)}
       </div>
       {showNewEntry&&<NewEntryModal member={me} onSave={saveEntry} onClose={()=>setShowNewEntry(false)}/>}
+      {editingDraft&&<NewEntryModal member={me} onSave={e=>{saveEntry(e);setEditingDraft(null);}} onClose={()=>setEditingDraft(null)} editEntry={editingDraft}/>}
       {showNotifs&&<NotificationsPanel entries={entries} members={members} currentMember={me} onClose={()=>setShowNotifs(false)} readNotifIds={readNotifIds} onMarkRead={markNotifsRead} onGoToEntry={goToEntry}/>}
       {viewingEntry&&<EntryReadModal entry={viewingEntry} members={members} onClose={()=>setViewingEntry(null)}/>}
     </div>
